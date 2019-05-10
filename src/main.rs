@@ -175,7 +175,8 @@ fn vim_edit_task(mut task: Rc<Task>) -> Rc<Task> {
 struct State {
     doc: Doc,
     wt: Uuid,
-    parents: Vec<Uuid>
+    parents: Vec<Uuid>,
+    path: String
 }
 
 fn main() {
@@ -183,7 +184,8 @@ fn main() {
     let state = State {
         wt: doc.root.clone(),
         doc: doc,
-        parents: Vec::new()
+        parents: Vec::new(),
+        path: "tasks.json".to_string()
     };
     let mut terminal = terminal::Terminal::new(state);
     terminal.register_command("exit", Box::new(|_, _| true));
@@ -218,20 +220,26 @@ fn main() {
     terminal.register_command("save", Box::new(|state: &mut State, cmd: &str| {
         let mut split = cmd.split(" ");
         split.next();
-        if let Some(filename) = split.next() {
-            state.doc.save(filename).expect("Couldn't save the file");
-        }
+        let filename = if let Some(filename) = split.next() {
+            filename
+        } else {
+            &state.path
+        };
+        state.doc.save(filename).expect("Couldn't save the file");
         false
     }));
     terminal.register_command("load", Box::new(|state: &mut State, cmd: &str| {
         let mut split = cmd.split(" ");
         split.next();
-        if let Some(filename) = split.next() {
-            let doc = Doc::load(filename).expect("Couldn't save the file");
-            let new_root = doc.root.clone();
-            state.doc = doc;
-            state.wt = new_root;
-        }
+        let filename = if let Some(filename) = split.next() {
+            filename
+        } else {
+            &state.path
+        };
+        let doc = Doc::load(filename).expect("Couldn't save the file");
+        let new_root = doc.root.clone();
+        state.doc = doc;
+        state.wt = new_root;
         false
     }));
     terminal.register_command("cd", Box::new(|state: &mut State, cmd: &str| {
