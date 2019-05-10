@@ -25,13 +25,28 @@ enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+enum Progress {
+    Todo, Work, Done
+}
+
+impl ToString for Progress {
+    fn to_string(&self) -> String {
+        match self {
+            Progress::Todo => "TODO".to_string(),
+            Progress::Work => "WORK".to_string(),
+            Progress::Done => "DONE".to_string()
+        }
+    }
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 struct Task {
     id: Uuid,
     title: String,
     body: String,
-    children: Vec<Uuid>
+    children: Vec<Uuid>,
+    progress: Option<Progress>
 }
 
 impl Task {
@@ -41,7 +56,8 @@ impl Task {
             id: root_id.clone(),
             title: String::new(),
             body: String::new(),
-            children: Vec::new()
+            children: Vec::new(),
+            progress: None
         }
     }
 }
@@ -51,6 +67,7 @@ trait TaskMod {
     fn set_body(&mut self, body: impl ToString) -> &mut Self;
     fn set_children(&mut self, children: Vec<Uuid>) -> &mut Self;
     fn add_child(&mut self, child: Uuid) -> &mut Self;
+    fn set_progress(&mut self, progress: Progress) -> &mut Self;
 }
 impl TaskMod for Rc<Task> {
     fn set_title(&mut self, title: impl ToString) -> &mut Self {
@@ -69,6 +86,10 @@ impl TaskMod for Rc<Task> {
         let mut children = self.children.clone();
         children.push(child);
         self.set_children(children);
+        self
+    }
+    fn set_progress(&mut self, progress: Progress) -> &mut Self {
+        Rc::make_mut(self).progress = Some(progress);
         self
     }
 }
@@ -171,8 +192,14 @@ fn main() {
         println!();
         println!("{}", task.body);
         println!("--- Children: ");
-        for (child, i) in task.children.iter().zip(1..) {
-            println!("{}: {}", i, state.doc.get(child).title);
+        for (child_id, i) in task.children.iter().zip(1..) {
+            let child = state.doc.get(child_id);
+            let progress_str = if let Some(progress) = &child.progress {
+                progress.to_string()
+            } else {
+                String::new()
+            };
+            println!("{}: {} {}", i, progress_str, child.title);
         }
         false
     }));
@@ -210,12 +237,30 @@ fn main() {
         split.next();
         if let Some(child) = split.next() {
             if let Ok(i) = child.parse::<usize>() {
-                let child_id = state.doc.get(&state.wt).children[i];
+                let child_id = state.doc.get(&state.wt).children[i - 1];
                 state.wt = child_id;
             } 
         } else {
             state.wt = state.doc.root.clone();
         }
+        false
+    }));
+    terminal.register_command("todo", Box::new(|state: &mut State, _| {
+        let mut task = state.doc.get(&state.wt);
+        task.set_progress(Progress::Todo);
+        state.doc.upsert(task);
+        false
+    }));
+    terminal.register_command("work", Box::new(|state: &mut State, _| {
+        let mut task = state.doc.get(&state.wt);
+        task.set_progress(Progress::Work);
+        state.doc.upsert(task);
+        false
+    }));
+    terminal.register_command("done", Box::new(|state: &mut State, _| {
+        let mut task = state.doc.get(&state.wt);
+        task.set_progress(Progress::Work);
+        state.doc.upsert(task);
         false
     }));
 
@@ -228,18 +273,4 @@ fn main() {
         }
         input.clear();
     }
-    
-
-    /*println!("Doc = {:?}", doc);
-    let mut root = doc.get_root();
-    root.set_title("Title");
-    doc.upsert(root);
-    match doc.save("tasks.json") {
-        Ok(_) => println!("Saved"),
-        Err(err) => println!("Error while saving: {}", err)
-    }
-
-    let doc = Doc::load("tasks.json").unwrap();
-    let root = doc.get_root();
-    println!("root = {:?}", root);*/
 }
