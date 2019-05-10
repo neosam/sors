@@ -174,7 +174,8 @@ fn vim_edit_task(mut task: Rc<Task>) -> Rc<Task> {
 #[derive(Debug)]
 struct State {
     doc: Doc,
-    wt: Uuid
+    wt: Uuid,
+    parents: Vec<Uuid>
 }
 
 fn main() {
@@ -182,6 +183,7 @@ fn main() {
     let state = State {
         wt: doc.root.clone(),
         doc: doc,
+        parents: Vec::new()
     };
     let mut terminal = terminal::Terminal::new(state);
     terminal.register_command("exit", Box::new(|_, _| true));
@@ -236,12 +238,18 @@ fn main() {
         let mut split = cmd.split(" ");
         split.next();
         if let Some(child) = split.next() {
-            if let Ok(i) = child.parse::<usize>() {
+            if child == ".." {
+                if let Some(parent) = state.parents.pop() {
+                    state.wt = parent;
+                }
+            } else if let Ok(i) = child.parse::<usize>() {
                 let child_id = state.doc.get(&state.wt).children[i - 1];
+                state.parents.push(state.wt.clone());
                 state.wt = child_id;
             } 
         } else {
             state.wt = state.doc.root.clone();
+            state.parents = Vec::new();
         }
         false
     }));
