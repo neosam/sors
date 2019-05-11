@@ -325,6 +325,50 @@ fn main() {
         }
         false
     }));
+    terminal.register_command("mv", Box::new(|state: &mut State, cmd: &str| {
+        let mut split = cmd.split(" ");
+        split.next();
+        let dest_id = {
+            if let Some(dest_string) = split.next() {
+                if let Ok(dest_id) = Uuid::parse_str(dest_string) {
+                    dest_id.clone()
+                } else {
+                    println!("Error while parsing first uuid");
+                    return false
+                }
+            } else {
+                println!("No first UUID specified");
+                return false
+            }
+        };
+        let to_id = {
+            if let Some(to_string) = split.next() {
+                if let Ok(to_id) = Uuid::parse_str(to_string) {
+                    to_id.clone()
+                } else {
+                    println!("Error while parsing second uuid");
+                    return false
+                }
+            } else {
+                println!("No second UUID specified");
+                return false
+            }
+        };
+        let parent_id = if let Some(parent_id) = state.doc.find_parent(&dest_id) {
+            parent_id.clone()
+        } else {
+            println!("Couldn't find parents");
+            return false;
+        };
+        let mut parent = state.doc.get(&parent_id);
+        parent.remove_child(&dest_id);
+        state.doc.upsert(parent);
+        let mut task = state.doc.get(&to_id);
+        task.add_child(dest_id);
+        state.doc.upsert(task);
+        false
+    }));
+    
 
     let mut input = String::new();
     loop {
