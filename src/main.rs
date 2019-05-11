@@ -156,6 +156,10 @@ impl Doc {
         self.modify_task(parent_ref, |mut parent| parent.add_child(task.id.clone()).clone() );
         self.upsert(task);
     }
+
+    fn find_parent(&self, task_ref: &Uuid) -> Option<Uuid> {
+        self.map.values().find(|task| task.children.iter().any(|child_id| child_id == task_ref)).map(|task| task.id.clone())
+    }
 }
 
 fn vim_edit_task(mut task: Rc<Task>) -> Rc<Task> {
@@ -289,6 +293,11 @@ fn main() {
     terminal.register_command("id", Box::new(|state: &mut State, _| {
         let task = state.doc.get(&state.wt);
         println!("Task ID: {}", task.id);
+        false
+    }));
+    terminal.register_command("parent", Box::new(|state: &mut State, _| {
+        let task = state.doc.get(&state.wt);
+        println!("Parent Task ID: {}", state.doc.find_parent(&task.id));
         false
     }));
 
