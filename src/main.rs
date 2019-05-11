@@ -289,7 +289,9 @@ fn main() {
                 let child_id = state.doc.get(&state.wt).children[i - 1];
                 state.parents.push(state.wt.clone());
                 state.wt = child_id;
-            } 
+            } else if let Ok(id) = Uuid::parse_str(child) {
+                state.wt = id.clone();
+            }
         } else {
             state.wt = state.doc.root.clone();
             state.parents = Vec::new();
