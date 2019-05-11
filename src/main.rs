@@ -74,6 +74,7 @@ trait TaskMod {
     fn set_body(&mut self, body: impl ToString) -> &mut Self;
     fn set_children(&mut self, children: Vec<Uuid>) -> &mut Self;
     fn add_child(&mut self, child: Uuid) -> &mut Self;
+    fn remove_child(&mut self, child: &Uuid) -> &mut Self;
     fn set_progress(&mut self, progress: Progress) -> &mut Self;
 }
 impl TaskMod for Rc<Task> {
@@ -92,6 +93,17 @@ impl TaskMod for Rc<Task> {
     fn add_child(&mut self, child: Uuid) -> &mut Self {
         let mut children = self.children.clone();
         children.push(child);
+        self.set_children(children);
+        self
+    }
+    fn remove_child(&mut self, child_id: &Uuid) -> &mut Self {
+        let children = self.children.iter().filter_map(|child| 
+            if child == child_id {
+                None
+            } else {
+                Some(child.clone())
+            }
+        ).collect();
         self.set_children(children);
         self
     }
@@ -297,7 +309,20 @@ fn main() {
     }));
     terminal.register_command("parent", Box::new(|state: &mut State, _| {
         let task = state.doc.get(&state.wt);
-        println!("Parent Task ID: {}", state.doc.find_parent(&task.id));
+        println!("Parent Task ID: {}", state.doc.find_parent(&task.id).expect("Parent not found"));
+        false
+    }));
+    terminal.register_command("rm", Box::new(|state: &mut State, cmd: &str| {
+        let mut split = cmd.split(" ");
+        split.next();
+        if let Some(child) = split.next() {
+            if let Ok(i) = child.parse::<usize>() {
+                let mut task = state.doc.get(&state.wt);
+                let child_id = state.doc.get(&state.wt).children[i - 1];
+                task.remove_child(&child_id);
+                state.doc.upsert(task);
+            }
+        }
         false
     }));
 
