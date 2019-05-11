@@ -1,4 +1,8 @@
+#[macro_use]
+extern crate lazy_static;
+
 use std::collections::HashMap;
+use std::env::var;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use std::io::Write;
@@ -9,7 +13,10 @@ use snafu::{Snafu, ResultExt, Backtrace, ErrorCompat, ensure};
 use std::rc::Rc;
 use std::process::{Command, Stdio};
 
-const TASK_FILE: &str = ".task.md";
+
+lazy_static! {
+    static ref TASK_FILE: String = format!("{}/.task.md", var("HOME").unwrap());
+}
 
 
 mod terminal;
@@ -153,15 +160,15 @@ impl Doc {
 
 fn vim_edit_task(mut task: Rc<Task>) -> Rc<Task> {
     {   
-        let mut out = File::create(TASK_FILE).expect("Could not create .task file");
+        let mut out = File::create(&*TASK_FILE).expect("Could not create .task file");
         out.write_all(task.title.as_bytes()).expect("Couldn't write title to .task file");
         out.write_all("\n\n".as_bytes()).expect("Couldn't write newlines to .task file");
         out.write_all(task.body.as_bytes()).expect("Couldn't write body to .task file");
     }
-    subprocess::Exec::cmd("vi").arg(TASK_FILE).join().unwrap();
+    subprocess::Exec::cmd("vi").arg(&*TASK_FILE).join().unwrap();
     let mut content = String::new();
     {
-        let mut input = File::open(TASK_FILE).expect("Could not open .task file");
+        let mut input = File::open(&*TASK_FILE).expect("Could not open .task file");
         input.read_to_string(&mut content).expect("Couldn't read .task file");
     }
     let mut lines = content.lines();
@@ -185,7 +192,7 @@ fn main() {
         wt: doc.root.clone(),
         doc: doc,
         parents: Vec::new(),
-        path: "tasks.json".to_string()
+        path: format!("{}/.tasks.json", var("HOME").unwrap())
     };
     let mut terminal = terminal::Terminal::new(state);
     terminal.register_command("exit", Box::new(|_, _| true));
@@ -275,13 +282,15 @@ fn main() {
     }));
     terminal.register_command("done", Box::new(|state: &mut State, _| {
         let mut task = state.doc.get(&state.wt);
-        task.set_progress(Progress::Work);
+        task.set_progress(Progress::Done);
         state.doc.upsert(task);
         false
     }));
 
     let mut input = String::new();
     loop {
+        print!("> ");
+        std::io::stdout().flush().expect("Couldn't flush stdout");
         std::io::stdin().read_line(&mut input).expect("Error while reading user input");
         let exit = terminal.run_command(&input);
         if exit {
