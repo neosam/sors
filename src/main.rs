@@ -174,7 +174,10 @@ impl Doc {
     }
 }
 
-fn rec_print(doc: &mut Doc, task_id: &Uuid, level: usize) {
+fn rec_print(doc: &mut Doc, task_id: &Uuid, level: usize, max_depth: usize) {
+    if level >= max_depth {
+        return;
+    }
     let task = doc.get(task_id);
     for _ in 0..level {
         print!(" ");
@@ -182,7 +185,7 @@ fn rec_print(doc: &mut Doc, task_id: &Uuid, level: usize) {
     print!("* ");
     println!("{} {}", task.id, task.title);
     for child_id in task.children.iter() {
-        rec_print(doc, child_id, level + 1);
+        rec_print(doc, child_id, level + 1, max_depth);
     }
 }
 
@@ -382,8 +385,19 @@ fn main() {
         state.doc.upsert(task);
         false
     }));
-    terminal.register_command("outline", Box::new(|state: &mut State, _| {
-        rec_print(&mut state.doc, &state.wt, 0);
+    terminal.register_command("outline", Box::new(|state: &mut State, cmd: &str| {
+        let mut split = cmd.split(" ");
+        split.next();
+        let max_depth = if let Some(depth_str) = split.next() {
+            if let Ok(max_depth) = depth_str.parse() {
+                max_depth
+            } else {
+                1000
+            }
+        } else {
+            1000
+        };
+        rec_print(&mut state.doc, &state.wt, 0, max_depth);
         false
     }));
     
