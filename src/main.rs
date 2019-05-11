@@ -174,6 +174,18 @@ impl Doc {
     }
 }
 
+fn rec_print(doc: &mut Doc, task_id: &Uuid, level: usize) {
+    let task = doc.get(task_id);
+    for _ in 0..level {
+        print!(" ");
+    }
+    print!("* ");
+    println!("{} {}", task.id, task.title);
+    for child_id in task.children.iter() {
+        rec_print(doc, child_id, level + 1);
+    }
+}
+
 fn vim_edit_task(mut task: Rc<Task>) -> Rc<Task> {
     {   
         let mut out = File::create(&*TASK_FILE).expect("Could not create .task file");
@@ -366,6 +378,10 @@ fn main() {
         let mut task = state.doc.get(&to_id);
         task.add_child(dest_id);
         state.doc.upsert(task);
+        false
+    }));
+    terminal.register_command("outline", Box::new(|state: &mut State, _| {
+        rec_print(&mut state.doc, &state.wt, 0);
         false
     }));
     
