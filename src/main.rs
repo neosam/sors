@@ -286,6 +286,11 @@ fn main() {
         state.doc.upsert(task);
         false
     }));
+    terminal.register_command("id", Box::new(|state: &mut State, _| {
+        let task = state.doc.get(&state.wt);
+        println!("Task ID: {}", task.id);
+        false
+    }));
 
     let mut input = String::new();
     loop {
