@@ -1,7 +1,7 @@
 use std::collections::HashMap;
+pub type Result<T, E=Box<dyn std::error::Error>> = std::result::Result<T, E>;
 
-
-pub type Func<T> = Box<Fn(&mut T, &str) -> bool>;
+pub type Func<T> = Box<Fn(&mut T, &str) -> Result<bool>>;
 
 pub struct Terminal<T: Sized> {
     state: T,
@@ -20,7 +20,10 @@ impl<T: Sized> Terminal<T> {
         if let Some(command) = line.trim().split(" ").next() {
             println!("Command: '{}'", command);
             if let Some(func) = self.commands.get(command) {
-                func(&mut self.state, line.trim())
+                match func(&mut self.state, line.trim()) {
+                    Ok(result) => result,
+                    Err(err) => { println!("Error: {}", err); false }
+                }
             } else {
                 false
             }

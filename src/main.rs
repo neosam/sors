@@ -27,7 +27,13 @@ enum Error {
     IO { source: std::io::Error },
 
     #[snafu(display("Serde Serialize Error: {}", source))]
-    SerdeSerializationError { source: serde_json::error::Error }
+    SerdeSerializationError { source: serde_json::error::Error },
+
+    /*#[snafu(display("From String Error: {}", source))]
+    SerdeSerializationError { source: std::str::From },
+*/
+    #[snafu(display("Not enough input provided"))]
+    UnsufficientInput {  }
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -74,6 +80,7 @@ trait TaskMod {
     fn set_body(&mut self, body: impl ToString) -> &mut Self;
     fn set_children(&mut self, children: Vec<Uuid>) -> &mut Self;
     fn add_child(&mut self, child: Uuid) -> &mut Self;
+    fn insert_child(&mut self, child: Uuid, index: usize) -> &mut Self;
     fn remove_child(&mut self, child: &Uuid) -> &mut Self;
     fn set_progress(&mut self, progress: Progress) -> &mut Self;
 }
@@ -93,6 +100,12 @@ impl TaskMod for Rc<Task> {
     fn add_child(&mut self, child: Uuid) -> &mut Self {
         let mut children = self.children.clone();
         children.push(child);
+        self.set_children(children);
+        self
+    }
+    fn insert_child(&mut self, child: Uuid, index: usize) -> &mut Self {
+        let mut children = self.children.clone();
+        children.insert(index, child);
         self.set_children(children);
         self
     }
@@ -279,8 +292,8 @@ fn main() {
         path: format!("{}/.tasks.json", var("HOME").unwrap())
     };
     let mut terminal = terminal::Terminal::new(state);
-    terminal.register_command("exit", Box::new(|_, _| true));
-    terminal.register_command("debug", Box::new(|state, _| { println!("{:?}", state); false }));
+    terminal.register_command("exit", Box::new(|_, _| Ok(true)));
+    terminal.register_command("debug", Box::new(|state, _| { println!("{:?}", state); Ok(false) }));
     terminal.register_command("ls", Box::new(|state: &mut State, _| {
         let task = state.doc.get(&state.wt);
         println!("{}", task.title);
@@ -296,17 +309,17 @@ fn main() {
             };
             println!("{}: {} {}", i, progress_str, child.title);
         }
-        false
+        Ok(false)
     }));
     terminal.register_command("ed", Box::new(|state: &mut State, _| {
         let task = vim_edit_task(state.doc.get(&state.wt));
         state.doc.upsert(task);
-        false
+        Ok(false)
     }));
     terminal.register_command("add", Box::new(|state: &mut State, _| {
         let task = vim_edit_task(Rc::new(Task::new()));
         state.doc.add_subtask(task, &state.wt);
-        false
+        Ok(false)
     }));
     terminal.register_command("save", Box::new(|state: &mut State, cmd: &str| {
         let mut split = cmd.split(" ");
@@ -317,7 +330,7 @@ fn main() {
             &state.path
         };
         state.doc.save(filename).expect("Couldn't save the file");
-        false
+        Ok(false)
     }));
     terminal.register_command("load", Box::new(|state: &mut State, cmd: &str| {
         let mut split = cmd.split(" ");
@@ -331,7 +344,7 @@ fn main() {
         let new_root = doc.root.clone();
         state.doc = doc;
         state.wt = new_root;
-        false
+        Ok(false)
     }));
     terminal.register_command("cd", Box::new(|state: &mut State, cmd: &str| {
         let mut split = cmd.split(" ");
@@ -352,35 +365,35 @@ fn main() {
             state.wt = state.doc.root.clone();
             state.parents = Vec::new();
         }
-        false
+        Ok(false)
     }));
     terminal.register_command("todo", Box::new(|state: &mut State, _| {
         let mut task = state.doc.get(&state.wt);
         task.set_progress(Progress::Todo);
         state.doc.upsert(task);
-        false
+        Ok(false)
     }));
     terminal.register_command("work", Box::new(|state: &mut State, _| {
         let mut task = state.doc.get(&state.wt);
         task.set_progress(Progress::Work);
         state.doc.upsert(task);
-        false
+        Ok(false)
     }));
     terminal.register_command("done", Box::new(|state: &mut State, _| {
         let mut task = state.doc.get(&state.wt);
         task.set_progress(Progress::Done);
         state.doc.upsert(task);
-        false
+        Ok(false)
     }));
     terminal.register_command("id", Box::new(|state: &mut State, _| {
         let task = state.doc.get(&state.wt);
         println!("Task ID: {}", task.id);
-        false
+        Ok(false)
     }));
     terminal.register_command("parent", Box::new(|state: &mut State, _| {
         let task = state.doc.get(&state.wt);
         println!("Parent Task ID: {}", state.doc.find_parent(&task.id).expect("Parent not found"));
-        false
+        Ok(false)
     }));
     terminal.register_command("rm", Box::new(|state: &mut State, cmd: &str| {
         let mut split = cmd.split(" ");
@@ -393,7 +406,7 @@ fn main() {
                 state.doc.upsert(task);
             }
         }
-        false
+        Ok(false)
     }));
     terminal.register_command("mv", Box::new(|state: &mut State, cmd: &str| {
         let mut split = cmd.split(" ");
@@ -404,11 +417,11 @@ fn main() {
                     dest_id.clone()
                 } else {
                     println!("Error while parsing first uuid");
-                    return false
+                    return Ok(false)
                 }
             } else {
                 println!("No first UUID specified");
-                return false
+                return Ok(false)
             }
         };
         let to_id = {
@@ -417,18 +430,18 @@ fn main() {
                     to_id.clone()
                 } else {
                     println!("Error while parsing second uuid");
-                    return false
+                    return Ok(false)
                 }
             } else {
                 println!("No second UUID specified");
-                return false
+                return Ok(false)
             }
         };
         let parent_id = if let Some(parent_id) = state.doc.find_parent(&dest_id) {
             parent_id.clone()
         } else {
             println!("Couldn't find parents");
-            return false;
+            return Ok(false);
         };
         let mut parent = state.doc.get(&parent_id);
         parent.remove_child(&dest_id);
@@ -436,7 +449,7 @@ fn main() {
         let mut task = state.doc.get(&to_id);
         task.add_child(dest_id);
         state.doc.upsert(task);
-        false
+        Ok(false)
     }));
     terminal.register_command("outline", Box::new(|state: &mut State, cmd: &str| {
         let mut split = cmd.split(" ");
@@ -451,13 +464,27 @@ fn main() {
             1000
         };
         rec_print(&mut state.doc, &state.wt, 0, max_depth);
-        false
+        Ok(false)
     }));
     terminal.register_command("html", Box::new(|state: &mut State, _| {
         if let Err(err) = dump_html(&state.doc, Path::new("html"), &state.wt) {
             println!("Couldn't dump html files: {}", err);
         }
-        false
+        Ok(false)
+    }));
+    terminal.register_command("reorder", Box::new(|state: &mut State, cmd: &str| {
+        let mut split = cmd.split(" ");
+        split.next();
+        let idx_string: &str = split.next().ok_or(Error::UnsufficientInput {})?;
+        let idx_from: usize = idx_string.parse()?;
+        let idx_string: &str = split.next().ok_or(Error::UnsufficientInput {})?;
+        let idx_to: usize = idx_string.parse()?;
+        let mut task = state.doc.get(&state.wt);
+        let from_id = task.children[idx_from - 1];
+        task.remove_child(&from_id);
+        task.insert_child(from_id, idx_to - 1);
+        state.doc.upsert(task);
+        Ok(false)
     }));
     
 
