@@ -172,6 +172,18 @@ impl Doc {
     fn find_parent(&self, task_ref: &Uuid) -> Option<Uuid> {
         self.map.values().find(|task| task.children.iter().any(|child_id| child_id == task_ref)).map(|task| task.id.clone())
     }
+
+    fn to_html(&self, task_ref: &Uuid) -> String {
+        let mut html = String::new();
+        let task = self.get(task_ref);
+        html.push_str("<!doctype html><html><head></head><body>");
+        html.push_str("<h1>");
+        html.push_str(&task.title);
+        html.push_str("</h1>");
+        html.push_str(&markdown::to_html(&task.body));
+        html.push_str("</body></html>");
+        html
+    }
 }
 
 fn rec_print(doc: &mut Doc, task_id: &Uuid, level: usize, max_depth: usize) {
@@ -398,6 +410,10 @@ fn main() {
             1000
         };
         rec_print(&mut state.doc, &state.wt, 0, max_depth);
+        false
+    }));
+    terminal.register_command("html", Box::new(|state: &mut State, _| {
+        println!("{}", state.doc.to_html(&state.wt));
         false
     }));
     
