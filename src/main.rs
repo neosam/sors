@@ -181,6 +181,23 @@ impl Doc {
         html.push_str(&task.title);
         html.push_str("</h1>");
         html.push_str(&markdown::to_html(&task.body));
+        html.push_str("<hr/>");
+        html.push_str("<ul>");
+        for child in task.children.iter() {
+            let child_task = self.get(child);
+            html.push_str("<li><a href=\"");
+            html.push_str(&child.to_string());
+            html.push_str(".html\">");
+            html.push_str(&if let Some(ref progress) = child_task.progress { 
+                progress.to_string()
+            } else {
+                String::new()
+            });
+            html.push_str(" ");
+            html.push_str(&child_task.title);
+            html.push_str("</a></li>");
+        }
+        html.push_str("</ul>");
         html.push_str("</body></html>");
         html
     }
@@ -199,6 +216,30 @@ fn rec_print(doc: &mut Doc, task_id: &Uuid, level: usize, max_depth: usize) {
     for child_id in task.children.iter() {
         rec_print(doc, child_id, level + 1, max_depth);
     }
+}
+
+fn dump_html_rec(doc: &Doc, dir: &Path, task_ref: &Uuid) -> Result<()> {
+    let task = doc.get(task_ref);
+    for child in task.children.iter() {
+        dump_html_rec(doc, dir, child)?;
+    }
+    let task_html = doc.to_html(task_ref);
+    let filename = dir.join(format!("{}.html", task_ref));
+    println!("{}", filename.to_str().unwrap_or("N/A"));
+    let mut html_file = File::create(filename).context(IO)?;
+    html_file.write_all(task_html.as_bytes()).context(IO)?;
+    Ok(())
+}
+
+fn dump_html(doc: &Doc, dir: &Path, task_ref: &Uuid) -> Result<()> {
+    std::fs::create_dir_all(dir).context(IO)?;
+    dump_html_rec(doc, dir, task_ref)?;
+    let filename = dir.join(format!("index.html"));
+    let mut index_file = File::create(filename).context(IO)?;
+    index_file.write_all(b"<!doctype html><html><head></head><body><a href=\"").context(IO)?;
+    index_file.write_all(task_ref.to_string().as_bytes()).context(IO)?;
+    index_file.write_all(b".html\">Index</a></body></html>").context(IO)?;
+    Ok(())
 }
 
 fn vim_edit_task(mut task: Rc<Task>) -> Rc<Task> {
@@ -413,7 +454,9 @@ fn main() {
         false
     }));
     terminal.register_command("html", Box::new(|state: &mut State, _| {
-        println!("{}", state.doc.to_html(&state.wt));
+        if let Err(err) = dump_html(&state.doc, Path::new("html"), &state.wt) {
+            println!("Couldn't dump html files: {}", err);
+        }
         false
     }));
     
