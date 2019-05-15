@@ -38,9 +38,18 @@ enum Error {
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 enum Progress {
     Todo, Work, Done
+}
+impl Progress {
+    pub fn done(self) -> bool {
+        match self {
+            Progress::Todo => false,
+            Progress::Work => false,
+            Progress::Done => true
+        }
+    }
 }
 
 impl ToString for Progress {
@@ -209,6 +218,9 @@ impl Doc {
             html.push_str(&format!("<a href=\"{}.html\">{}</a>", breadcrumb_ref, task.title));
         });
 
+        let (done, all_subtasks) = self.progress_summary(task_ref);
+        html.push_str(&format!("[{}/{}]", done, all_subtasks));
+
         html.push_str(&markdown::to_html(&task.body));
         html.push_str("<hr/>");
         html.push_str("<ul>");
@@ -229,6 +241,16 @@ impl Doc {
         html.push_str("</ul>");
         html.push_str("</body></html>");
         html
+    }
+
+    fn progress_summary(&self, task_ref: &Uuid) -> (i32, i32) {
+        self.get(task_ref)
+            .children.iter()
+            .filter_map(|child| self.get(child).progress)
+            .fold((0, 0), |(acc_done, acc_sum), progress| (
+                acc_done + if progress.done() { 1 } else { 0 },
+                acc_sum + 1
+            ))
     }
 }
 
