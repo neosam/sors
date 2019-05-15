@@ -312,7 +312,24 @@ fn main() {
     terminal.register_command("debug", Box::new(|state, _| { println!("{:?}", state); Ok(false) }));
     terminal.register_command("ls", Box::new(|state: &mut State, _| {
         let task = state.doc.get(&state.wt);
-        println!("{}", task.title);
+        let mut breadcrumb_item_opn = Some(state.wt.clone());
+        let mut breadcrumb_data = Vec::new();
+        loop {
+            if let Some(breadcrumb_item) = breadcrumb_item_opn {
+                breadcrumb_data.push(breadcrumb_item.clone());
+                breadcrumb_item_opn = state.doc.find_parent(&breadcrumb_item);
+            } else {
+                break;
+            }
+        }
+        breadcrumb_data.iter().rev().zip(1..).for_each(|(breadcrumb_ref, i)| {
+            let task = state.doc.get(breadcrumb_ref);
+            if i > 1 {
+                print!(" -> ");
+            }
+            print!("{}", task.title);
+        });
+        println!();
         println!();
         println!("{}", task.body);
         println!("--- Children: ");
