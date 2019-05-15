@@ -190,9 +190,25 @@ impl Doc {
         let mut html = String::new();
         let task = self.get(task_ref);
         html.push_str("<!doctype html><html><head></head><body>");
-        html.push_str("<h1>");
-        html.push_str(&task.title);
-        html.push_str("</h1>");
+
+        let mut breadcrumb_item_opn = Some(task_ref.clone());
+        let mut breadcrumb_data = Vec::new();
+        loop {
+            if let Some(breadcrumb_item) = breadcrumb_item_opn {
+                breadcrumb_data.push(breadcrumb_item.clone());
+                breadcrumb_item_opn = self.find_parent(&breadcrumb_item);
+            } else {
+                break;
+            }
+        }
+        breadcrumb_data.iter().rev().zip(1..).for_each(|(breadcrumb_ref, i)| {
+            let task = self.get(breadcrumb_ref);
+            if i > 1 {
+                html.push_str(" -> ");
+            }
+            html.push_str(&format!("<a href=\"{}.html\">{}</a>", breadcrumb_ref, task.title));
+        });
+
         html.push_str(&markdown::to_html(&task.body));
         html.push_str("<hr/>");
         html.push_str("<ul>");
