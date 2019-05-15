@@ -351,7 +351,8 @@ fn main() {
             }
             print!("{}", task.title);
         });
-        println!();
+        let (done, all_subtasks) = state.doc.progress_summary(&task.id);
+        println!("  [{}/{}]", done, all_subtasks);
         println!();
         println!("{}", task.body);
         println!("--- Children: ");
