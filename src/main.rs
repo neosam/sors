@@ -198,7 +198,7 @@ impl Doc {
     fn to_html(&self, task_ref: &Uuid) -> String {
         let mut html = String::new();
         let task = self.get(task_ref);
-        html.push_str("<!doctype html><html><head></head><body>");
+        html.push_str("<!doctype html><html><head><link rel=\"stylesheet\" href=\"https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css\" integrity=\"sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T\" crossorigin=\"anonymous\"></head><body><div class=\"container\">");
 
         let mut breadcrumb_item_opn = Some(task_ref.clone());
         let mut breadcrumb_data = Vec::new();
@@ -239,7 +239,7 @@ impl Doc {
             html.push_str("</a></li>");
         }
         html.push_str("</ul>");
-        html.push_str("</body></html>");
+        html.push_str("</div></body></html>");
         html
     }
 
