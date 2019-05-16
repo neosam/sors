@@ -12,6 +12,7 @@ use std::path::Path;
 use snafu::{Snafu, ResultExt, Backtrace, ErrorCompat, ensure};
 use std::rc::Rc;
 use std::process::{Command, Stdio};
+use chrono::prelude::*;
 
 
 lazy_static! {
@@ -136,8 +137,47 @@ impl TaskMod for Rc<Task> {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+struct Clock {
+    id: Uuid,
+    start: DateTime<Local>,
+    end: Option<DateTime<Local>>,
+    comment: Option<String>,
+    task_id: Option<Uuid>
+}
+
+trait ClockMod {
+    fn set_start(&mut self, start: DateTime<Local>) -> &mut Self;
+    fn set_end(&mut self, end: DateTime<Local>) -> &mut Self;
+    fn set_comment(&mut self, comment: String) -> &mut Self;
+    fn set_task_id(&mut self, task_id: Uuid) -> &mut Self;
+}
+
+impl ClockMod for Rc<Clock> {
+    fn set_start(&mut self, start: DateTime<Local>) -> &mut Self {
+        Rc::make_mut(self).start = start;
+        self
+    }
+    fn set_end(&mut self, end: DateTime<Local>) -> &mut Self {
+        Rc::make_mut(self).end = Some(end);
+        self
+    }
+    fn set_comment(&mut self, comment: String) -> &mut Self {
+        Rc::make_mut(self).comment = Some(comment);
+        self
+    }
+    fn set_task_id(&mut self, task_id: Uuid) -> &mut Self {
+        Rc::make_mut(self).task_id = Some(task_id);
+        self
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct Doc {
     map: HashMap<Uuid, Rc<Task>>,
+
+    #[serde(default)]
+    clocks: HashMap<Uuid, Rc<Clock>>,
+    current_clock: Option<Uuid>,
     root: Uuid
 }
 
@@ -149,6 +189,8 @@ impl Doc {
         map.insert(root_id.clone(), Rc::new(root));
         Doc {
             map: map,
+            clocks: HashMap::default(),
+            current_clock: None,
             root: root_id
         }
     }
