@@ -148,13 +148,26 @@ struct Clock {
     task_id: Option<Uuid>
 }
 
+impl std::cmp::PartialEq for Clock {
+    fn eq(&self, o: &Self) -> bool {
+        self.eq(o)
+    }
+}
+impl std::cmp::Eq for Clock {}
+impl std::cmp::PartialOrd for Clock {
+    fn partial_cmp(&self, o: &Self) -> Option<std::cmp::Ordering> {
+        self.start.partial_cmp(&o.start)
+    }
+}
+impl std::cmp::Ord for Clock {
+    fn cmp(&self, o: &Self) -> std::cmp::Ordering {
+        self.start.cmp(&o.start)
+    }
+}
+
 impl Clock {
-    pub fn duration(&self) -> Option<chrono::Duration> {
-        if let Some(end) = self.end {
-            Some(end - self.start)
-        } else {
-            None
-        }
+    pub fn duration(&self) -> chrono::Duration {
+        self.end.unwrap_or_else(|| Local::now()) - self.start
     }
 }
 
@@ -366,9 +379,24 @@ impl Doc {
         Ok(())
     }
 
+    fn clock_comment(&mut self, comment: impl ToString) -> Result<()> {
+        if let Some(ref clock_ref) = self.current_clock {
+            let mut clock = self.clock(clock_ref)?;
+            clock.set_comment(comment.to_string());
+            self.upsert_clock(clock);
+        }
+        Ok(())
+    }
+
     fn task_clock(&self, task_ref: &Uuid) -> Vec<Rc<Clock>> {
         self.clocks.values()
             .filter(|clock| clock.task_id == Some(*task_ref))
+            .map(|clock| clock.clone()).collect()
+    }
+    
+    fn day_clock(&self, date: Date<Local>) -> Vec<Rc<Clock>> {
+        self.clocks.values()
+            .filter(|clock| clock.start.date() == date)
             .map(|clock| clock.clone()).collect()
     }
 }
@@ -670,15 +698,46 @@ fn main() {
         state.doc.clock_out()?;
         Ok(false)
     }));
+    terminal.register_command("clc", Box::new(|state: &mut State, _| {
+        let mut comment = String::new();
+        print!("Clock comment> ");
+        std::io::stdout().flush()?;
+        std::io::stdin().read_line(&mut comment)?;
+        state.doc.clock_comment(comment.trim())?;
+        Ok(false)
+    }));
+
     terminal.register_command("taskclock", Box::new(|state: &mut State, _| {
-        let clocks = state.doc.task_clock(&state.wt);
+        let mut clocks = state.doc.task_clock(&state.wt);
+        clocks.sort();
         let overall_duration = clocks.iter()
-            .filter_map(|clock| clock.duration())
+            .map(|clock| clock.duration())
             .fold(chrono::Duration::zero(), |acc, new| acc + new);
+        for clock in clocks.iter() {
+            let start = &clock.start;
+            let end = clock.end.map(|end| format!("{}", end)).unwrap_or("(none)".to_string());
+            let comment = clock.comment.clone().map(|comment| comment).unwrap_or("(none)".to_string());
+            println!("{} - {}: {}", start, end, comment);
+        }
         println!("{}", overall_duration.print());
         Ok(false)
     }));
-    
+    terminal.register_command("dayclock", Box::new(|state: &mut State, _| {
+        let mut clocks = state.doc.day_clock(Local::today());
+        clocks.sort();
+        let overall_duration = clocks.iter()
+            .map(|clock| clock.duration())
+            .fold(chrono::Duration::zero(), |acc, new| acc + new);
+
+        for clock in clocks.iter() {
+            let start = &clock.start;
+            let end = clock.end.map(|end| format!("{}", end)).unwrap_or("(none)".to_string());
+            let comment = clock.comment.clone().map(|comment| comment).unwrap_or("(none)".to_string());
+            println!("{} - {}: {}", start, end, comment);
+        }
+        println!("{}", overall_duration.print());
+        Ok(false)
+    }));    
 
     let mut input = String::new();
     loop {
