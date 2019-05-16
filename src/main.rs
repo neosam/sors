@@ -184,6 +184,21 @@ impl ClockMod for Rc<Clock> {
     }
 }
 
+trait DurationPrint {
+    fn print(&self) -> String;
+}
+
+impl DurationPrint for chrono::Duration {
+    fn print(&self) -> String {
+        format!("{}d {}h {}m {}s",
+            self.num_days(),
+            self.num_hours() % 24,
+            self.num_minutes() % 60,
+            self.num_seconds() % 60
+        )
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Doc {
     map: HashMap<Uuid, Rc<Task>>,
@@ -660,7 +675,7 @@ fn main() {
         let overall_duration = clocks.iter()
             .filter_map(|clock| clock.duration())
             .fold(chrono::Duration::zero(), |acc, new| acc + new);
-        println!("{}", overall_duration);
+        println!("{}", overall_duration.print());
         Ok(false)
     }));
     
