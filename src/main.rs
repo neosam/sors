@@ -34,7 +34,10 @@ enum Error {
     SerdeSerializationError { source: std::str::From },
 */
     #[snafu(display("Not enough input provided"))]
-    UnsufficientInput {  }
+    UnsufficientInput {  },
+
+    #[snafu(display("Clock could not be found"))]
+    ClockNotFound {  }
 }
 
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -143,6 +146,16 @@ struct Clock {
     end: Option<DateTime<Local>>,
     comment: Option<String>,
     task_id: Option<Uuid>
+}
+
+impl Clock {
+    pub fn duration(&self) -> Option<chrono::Duration> {
+        if let Some(end) = self.end {
+            Some(end - self.start)
+        } else {
+            None
+        }
+    }
 }
 
 trait ClockMod {
@@ -293,6 +306,55 @@ impl Doc {
                 acc_done + if progress.done() { 1 } else { 0 },
                 acc_sum + 1
             ))
+    }
+
+    fn clock(&self, clock_ref: &Uuid) -> Result<Rc<Clock>> {
+        self.clocks.get(clock_ref).map(|item| item.clone()).ok_or(Error::ClockNotFound {})
+    }
+
+    fn upsert_clock(&mut self, clock: Rc<Clock>) {
+        self.clocks.insert(clock.id.clone(), clock);
+    }
+
+    fn clock_out(&mut self) -> Result<bool> {
+        if let Some(ref clock_ref) = self.current_clock {
+            let mut clock = self.clock(clock_ref)?;
+            clock.set_end(Local::now());
+            self.upsert_clock(clock);
+            self.current_clock = None;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn clock_new(&mut self) -> Result<Rc<Clock>> {
+        self.clock_out()?;
+        let clock = Rc::new(Clock {
+            id: Uuid::new_v4(),
+            start: Local::now(),
+            end: None,
+            comment: None,
+            task_id: None
+        });
+        self.upsert_clock(clock.clone());
+        self.current_clock = Some(clock.id.clone());
+        Ok(clock)
+    }
+
+    fn clock_assign(&mut self, task_ref: Uuid) -> Result<()> {
+        if let Some(ref clock_ref) = self.current_clock {
+            let mut clock = self.clock(clock_ref)?;
+            clock.set_task_id(task_ref);
+            self.upsert_clock(clock);
+        }
+        Ok(())
+    }
+
+    fn task_clock(&self, task_ref: &Uuid) -> Vec<Rc<Clock>> {
+        self.clocks.values()
+            .filter(|clock| clock.task_id == Some(*task_ref))
+            .map(|clock| clock.clone()).collect()
     }
 }
 
@@ -582,6 +644,23 @@ fn main() {
         task.remove_child(&from_id);
         task.insert_child(from_id, idx_to - 1);
         state.doc.upsert(task);
+        Ok(false)
+    }));
+    terminal.register_command("cli", Box::new(|state: &mut State, _| {
+        state.doc.clock_new()?;
+        state.doc.clock_assign(state.wt.clone())?;
+        Ok(false)
+    }));
+    terminal.register_command("clo", Box::new(|state: &mut State, _| {
+        state.doc.clock_out()?;
+        Ok(false)
+    }));
+    terminal.register_command("taskclock", Box::new(|state: &mut State, _| {
+        let clocks = state.doc.task_clock(&state.wt);
+        let overall_duration = clocks.iter()
+            .filter_map(|clock| clock.duration())
+            .fold(chrono::Duration::zero(), |acc, new| acc + new);
+        println!("{}", overall_duration);
         Ok(false)
     }));
     
