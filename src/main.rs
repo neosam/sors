@@ -39,12 +39,13 @@ impl DurationPrint for chrono::Duration {
 
 
 fn main() {
-    let doc = Doc::new();
+    let main_file_path = format!("{}/.tasks.json", var("HOME").unwrap());
+    let doc = Doc::load(&main_file_path).unwrap_or(Doc::new());
     let state = State {
         wt: doc.root.clone(),
         doc: doc,
         parents: Vec::new(),
-        path: format!("{}/.tasks.json", var("HOME").unwrap())
+        path: main_file_path
     };
     let mut terminal = terminal::Terminal::new(state);
     terminal.register_command("exit", Box::new(|_, _| Ok(true)));
