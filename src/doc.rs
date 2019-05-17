@@ -1,3 +1,5 @@
+//! Holding data which are serialized and stored to disk.
+
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use super::tasks::*;
@@ -13,6 +15,24 @@ use snafu::ResultExt;
 use chrono::prelude::*;
 use super::statics::*;
 
+/// Holding data which are serialized and stored to disk.
+/// 
+/// # Example
+/// 
+/// ```
+/// use todoapp3::doc::Doc;
+/// use todoapp3::tasks::Task;
+/// use todoapp3::TaskMod;
+/// use std::rc::Rc;
+/// 
+/// let mut doc = Doc::new();
+/// doc.modify_task(&doc.root.clone(), |mut task| {
+///     task
+///         .set_title("Title of the root task")
+///         .set_body("Some text");
+///     task
+/// })
+/// ```
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Doc {
     pub map: HashMap<Uuid, Rc<Task>>,
@@ -24,6 +44,17 @@ pub struct Doc {
 }
 
 impl Doc {
+    /// Create a new, empty document.
+    /// 
+    /// It is initialized with one empty root task which contains
+    /// a random UUID.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use todoapp3::doc::Doc;
+    /// let doc = Doc::new();
+    /// ```
     pub fn new() -> Doc {
         let mut map = HashMap::new();
         let root = Task::new();
@@ -37,12 +68,18 @@ impl Doc {
         }
     }
 
+    /// Write the content to into the specified file.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
         Ok(serde_json::to_writer(
             File::create(path).context(IO)?, self)
             .context(SerdeSerializationError)?)
     }
 
+    /// Load the document of hte given path and return a new doc.
+    /// 
+    /// # Error
+    /// Produces an error if there are IO issues or if the file format
+    /// couldn't be parsed.
     pub fn load(path: impl AsRef<Path>) -> Result<Doc> {
         Ok(
             serde_json::from_reader(
@@ -51,18 +88,30 @@ impl Doc {
         )
     }
 
+    /// Load task which contains the given id.
+    /// 
+    /// # Panic
+    /// Panics if no task does exist.
     pub fn get(&self, id: &Uuid) -> Rc<Task> {
         self.map.get(id).unwrap().clone()
     }
 
+    /// Get the root task.
     pub fn get_root(&self) -> Rc<Task> {
         self.get(&self.root)
     }
 
+    /// Adds or replaces the given task.
+    /// 
+    /// The task is identified by its id.
     pub fn upsert(&mut self, task: Rc<Task>) {
         self.map.insert(task.id.clone(), task);
     }
 
+    /// Modify the task with a function or closure
+    /// 
+    /// # Panic
+    /// Panics if no id for the task exists.
     pub fn modify_task<F>(&mut self, id: &Uuid, func: F)
             where F: Fn(Rc<Task>) -> Rc<Task> {
         let task = self.get(id);
@@ -70,15 +119,26 @@ impl Doc {
         self.upsert(task);
     }
 
+    /// Add a new task as child of the given parent id.
+    /// 
+    /// # Panic
+    /// Panics if the id of the parent task doesn't exist.
     pub fn add_subtask(&mut self, task: Rc<Task>, parent_ref: &Uuid) {
         self.modify_task(parent_ref, |mut parent| parent.add_child(task.id.clone()).clone() );
         self.upsert(task);
     }
 
+    /// Return the parent of the given task.
+    /// 
+    /// It will be None, if not found.
     pub fn find_parent(&self, task_ref: &Uuid) -> Option<Uuid> {
         self.map.values().find(|task| task.children.iter().any(|child_id| child_id == task_ref)).map(|task| task.id.clone())
     }
 
+    /// Return a String which contains a html code which represents the givent task.
+    /// 
+    /// # Panic
+    /// Panics if the task id is not found.
     pub fn to_html(&self, task_ref: &Uuid) -> String {
         let mut html = String::new();
         let task = self.get(task_ref);
@@ -127,6 +187,12 @@ impl Doc {
         html
     }
 
+    /// Summary how many children are done vs how many have any progress state.
+    /// 
+    /// It counts the children which have a progress assigned which indicates that
+    /// the task is not done in the first tuple entry and the count of children
+    /// which contain any progress field.  Actually, this is the current progress
+    /// state of the task: todo/all.
     pub fn progress_summary(&self, task_ref: &Uuid) -> (i32, i32) {
         self.get(task_ref)
             .children.iter()
@@ -137,14 +203,25 @@ impl Doc {
             ))
     }
 
+    /// Get the clock which is under the name.
+    /// 
+    /// # Error
+    /// Returns an error if a clock wasn't found under the name.
     pub fn clock(&self, clock_ref: &Uuid) -> Result<Rc<Clock>> {
         self.clocks.get(clock_ref).map(|item| item.clone()).ok_or(Error::ClockNotFound {})
     }
 
+    /// Insert or replace the clock.
     pub fn upsert_clock(&mut self, clock: Rc<Clock>) {
         self.clocks.insert(clock.id.clone(), clock);
     }
 
+    /// Stops clocking time.
+    /// 
+    /// # Error
+    /// If the internal state is incorrect and the current_clock
+    /// references to a clock which doesn't exist, it will return
+    /// an error.
     pub fn clock_out(&mut self) -> Result<bool> {
         if let Some(ref clock_ref) = self.current_clock {
             let mut clock = self.clock(clock_ref)?;
@@ -157,6 +234,11 @@ impl Doc {
         }
     }
 
+    /// Generate a new clock which starts at the time it was called.
+    /// 
+    /// # Error
+    /// Return an error on an internal error if the clock out doesn't
+    /// work.
     pub fn clock_new(&mut self) -> Result<Rc<Clock>> {
         self.clock_out()?;
         let clock = Rc::new(Clock {
@@ -171,6 +253,11 @@ impl Doc {
         Ok(clock)
     }
 
+    /// Assign the given task to the active clock.
+    /// 
+    /// # Error
+    /// It will return an error if the internal state is wrong and the current
+    /// clock id cannot be found.
     pub fn clock_assign(&mut self, task_ref: Uuid) -> Result<()> {
         if let Some(ref clock_ref) = self.current_clock {
             let mut clock = self.clock(clock_ref)?;
@@ -180,6 +267,11 @@ impl Doc {
         Ok(())
     }
 
+    /// Set the comment of the active clock.
+    /// 
+    /// # Error
+    /// It will return an error if the internal state is wrong and the current
+    /// clock id cannot be found.
     pub fn clock_comment(&mut self, comment: impl ToString) -> Result<()> {
         if let Some(ref clock_ref) = self.current_clock {
             let mut clock = self.clock(clock_ref)?;
@@ -189,12 +281,14 @@ impl Doc {
         Ok(())
     }
 
+    /// Get the clocks assigned to the given task.
     pub fn task_clock(&self, task_ref: &Uuid) -> Vec<Rc<Clock>> {
         self.clocks.values()
             .filter(|clock| clock.task_id == Some(*task_ref))
             .map(|clock| clock.clone()).collect()
     }
     
+    /// Get the clocks for the given date.
     pub fn day_clock(&self, date: Date<Local>) -> Vec<Rc<Clock>> {
         self.clocks.values()
             .filter(|clock| clock.start.date() == date)

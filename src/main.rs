@@ -1,13 +1,13 @@
 #[macro_use]
 extern crate lazy_static;
 
-mod statics;
-mod error;
-mod tasks;
-mod clock;
-mod doc;
-mod state;
-mod terminal;
+pub mod statics;
+pub mod error;
+pub mod tasks;
+pub mod clock;
+pub mod doc;
+pub mod state;
+pub mod terminal;
 
 use std::env::var;
 use uuid::Uuid;
