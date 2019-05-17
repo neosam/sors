@@ -23,15 +23,85 @@ use super::statics::*;
 /// use todoapp3::doc::Doc;
 /// use todoapp3::tasks::Task;
 /// use todoapp3::TaskMod;
+/// use todoapp3::tasks::Progress;
 /// use std::rc::Rc;
 /// 
+/// // Initialize the doc.
 /// let mut doc = Doc::new();
-/// doc.modify_task(&doc.root.clone(), |mut task| {
+/// 
+/// // The doc now contains one single root task.  Lets edit its title and
+/// // body text.
+/// doc.modify_task(&doc.root.clone(), |task| {
 ///     task
 ///         .set_title("Title of the root task")
 ///         .set_body("Some text");
-///     task
-/// })
+/// });
+/// 
+/// // Now lets access the roots title.
+/// assert_eq!(doc.get_root().title, "Title of the root task");
+/// 
+/// // Add lets generate a new task and set some title as well.
+/// let mut child1 = Rc::new(Task::new());
+/// child1.set_title("I'm the child");
+/// 
+/// // New lets add this text under the root.
+/// let root_ref = doc.root.clone();
+/// doc.add_subtask(child1, &root_ref);
+/// 
+/// // Now lets read the title of doc's first child.
+/// {
+///     // Get the new root
+///     let root = doc.get_root();
+///     // Get the child.  `children` is a Vec of IDs which are
+///     // used to get the task.
+///     let child = doc.get(&root.children[0]);
+///     // Read the title
+///     assert_eq!("I'm the child", child.title);
+/// 
+/// }
+/// 
+/// // Now lets add a body to the child
+/// {
+///     // Get the root
+///     let root = doc.get_root();
+///     // Get the child's id
+///     let child_id = root.children[0];
+///     // Modify the body
+///     doc.modify_task(&child_id, |child| {
+///         child.set_body("This is the child's body");
+///     });
+///     // Read the body
+///     assert_eq!("This is the child's body", doc.get(&child_id).body);
+/// }
+/// 
+/// 
+/// // Now lets work on the child
+/// {
+///     // Get the root
+///     let root = doc.get_root();
+///     // Get the child's id
+///     let child_id = root.children[0];
+/// 
+///     // Let's make it a task and assign TODO to it
+///     doc.modify_task(&child_id, |child| {
+///         child.set_progress(Progress::Todo);
+///     });
+/// 
+///     // Start working and start tracking the time.
+///     doc.clock_new().expect("Create a new clock");
+///     
+///     // Lets point the current clock to the child task.
+///     doc.clock_assign(child_id).expect("Assign clock");
+/// 
+///     // Do some work.  And when done, mark it as done.
+///     doc.modify_task(&child_id, |child| {
+///         child.set_progress(Progress::Done);
+///     });
+/// 
+///     // And finally clock out.
+///     doc.clock_out().expect("Clocking out");
+/// }
+/// 
 /// ```
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Doc {
@@ -113,9 +183,10 @@ impl Doc {
     /// # Panic
     /// Panics if no id for the task exists.
     pub fn modify_task<F>(&mut self, id: &Uuid, func: F)
-            where F: Fn(Rc<Task>) -> Rc<Task> {
-        let task = self.get(id);
-        let task = func(task);
+            where F: Fn(&mut Rc<Task>) {
+        let mut task = self.get(id);
+        Rc::make_mut(&mut task);
+        func(&mut task);
         self.upsert(task);
     }
 
@@ -124,7 +195,7 @@ impl Doc {
     /// # Panic
     /// Panics if the id of the parent task doesn't exist.
     pub fn add_subtask(&mut self, task: Rc<Task>, parent_ref: &Uuid) {
-        self.modify_task(parent_ref, |mut parent| parent.add_child(task.id.clone()).clone() );
+        self.modify_task(parent_ref, |parent| { parent.add_child(task.id.clone()); });
         self.upsert(task);
     }
 
