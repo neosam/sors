@@ -4,8 +4,8 @@ pub type Result<T, E=Box<dyn std::error::Error>> = std::result::Result<T, E>;
 pub type Func<T> = Box<Fn(&mut T, &str) -> Result<bool>>;
 
 pub struct Terminal<T: Sized> {
-    state: T,
-    commands: HashMap<String, Func<T>>
+    pub state: T,
+    pub commands: HashMap<String, Func<T>>
 }
 
 impl<T: Sized> Terminal<T> {
