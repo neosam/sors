@@ -45,7 +45,8 @@ fn main() {
         wt: doc.root.clone(),
         doc: doc,
         parents: Vec::new(),
-        path: main_file_path.clone()
+        path: main_file_path.clone(),
+        autosave: Autosave::ManualOnly,
     };
     let mut terminal = terminal::Terminal::new(state);
     terminal.register_command("exit", Box::new(|_, _| Ok(true)));
@@ -316,8 +317,10 @@ fn main() {
         std::io::stdout().flush().expect("Couldn't flush stdout");
         std::io::stdin().read_line(&mut input).expect("Error while reading user input");
         let exit = terminal.run_command(&input);
-        if let Err(err) = terminal.state.doc.save(&main_file_path) {
-            println!("Couldn't save the file, sorry: {}", err);
+        if Autosave::OnCommand == terminal.state.autosave {
+            if let Err(err) = terminal.state.doc.save(&main_file_path) {
+                println!("Couldn't save the file, sorry: {}", err);
+            }
         }
         if exit {
             break;
