@@ -309,7 +309,15 @@ fn main() {
         }
         println!("{}", overall_duration.print());
         Ok(false)
-    }));    
+    }));
+    terminal.register_command("autosave", Box::new(|state: &mut State, _| {
+        state.autosave = Autosave::OnCommand;
+        Ok(false)
+    }));
+    terminal.register_command("noautosave", Box::new(|state: &mut State, _| {
+        state.autosave = Autosave::ManualOnly;
+        Ok(false)
+    }));
 
     let mut input = String::new();
     loop {
