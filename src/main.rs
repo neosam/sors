@@ -266,6 +266,14 @@ fn main() {
         state.doc.clock_assign(state.wt.clone())?;
         Ok(false)
     }));
+    terminal.register_command("cln", Box::new(|state: &mut State, _| {
+        state.doc.clock_new()?;
+        Ok(false)
+    }));
+    terminal.register_command("cla", Box::new(|state: &mut State, _| {
+        state.doc.clock_assign(state.wt.clone())?;
+        Ok(false)
+    }));
     terminal.register_command("clo", Box::new(|state: &mut State, _| {
         state.doc.clock_out()?;
         Ok(false)
