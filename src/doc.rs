@@ -206,6 +206,21 @@ impl Doc {
         self.map.values().find(|task| task.children.iter().any(|child_id| child_id == task_ref)).map(|task| task.id.clone())
     }
 
+    /// Get all tasks, from the given one to the root.
+    pub fn path(&self, task_ref: &Uuid) -> Vec<Uuid> {
+        let mut res = Vec::new();
+        let mut task_ref_opt = Some(task_ref.clone());
+        loop {
+            if let Some(task_ref) = task_ref_opt {
+                res.push(task_ref.clone());
+                task_ref_opt = self.find_parent(&task_ref);
+            } else {
+                break;
+            }
+        }
+        res
+    }
+
     /// Return a String which contains a html code which represents the givent task.
     /// 
     /// # Panic
