@@ -8,6 +8,9 @@ pub mod clock;
 pub mod doc;
 pub mod state;
 pub mod terminal;
+pub mod clockedit;
+pub mod clockeditcli;
+pub mod helper;
 
 use std::env::var;
 use uuid::Uuid;
@@ -20,6 +23,8 @@ use error::*;
 use tasks::*;
 use doc::*;
 use state::*;
+use clockeditcli::*;
+use helper::*;
 
 
 trait DurationPrint {
@@ -35,24 +40,6 @@ impl DurationPrint for chrono::Duration {
             self.num_seconds() % 60
         )
     }
-}
-
-//mut acc: String, (item, i): (String, usize)) -> String
-
-fn fold_strings<'a>(sep: &'a str) -> impl FnMut(String, (String, usize)) -> String + 'a {
-    move | mut acc, (item, i) | {
-        if i > 1 {
-            acc.push_str(sep);
-        }
-        acc.push_str(&item);
-        acc
-    }
-}
-
-fn join_strings(strings: impl Iterator<Item=String>, sep: &str) -> String {
-    strings
-        .zip(1..)
-        .fold(String::new(), fold_strings(sep))
 }
 
 
@@ -358,6 +345,19 @@ fn main() {
     }));
     terminal.register_command("noautosave", Box::new(|state: &mut State, _| {
         state.autosave = Autosave::ManualOnly;
+        Ok(false)
+    }));
+    terminal.register_command("cle", Box::new(|state: &mut State, _| {
+        let clockeditcli = ClockEditCli {
+            clockedit: state.doc.create_clock_edit(Local::today()),
+            apply_result: ExitAction::Cancel
+        };
+        let final_value = clockeditcli.run();
+        if final_value.apply_result == ExitAction::Apply {
+            for clock in final_value.clockedit.clocks.iter().cloned() {
+                state.doc.upsert_clock(clock);
+            }
+        }
         Ok(false)
     }));
 

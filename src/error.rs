@@ -17,7 +17,13 @@ pub enum Error {
     UnsufficientInput {  },
 
     #[snafu(display("Clock could not be found"))]
-    ClockNotFound {  }
+    ClockNotFound {  },
+
+    #[snafu(display("Clock is out of index"))]
+    ClockOutOfIndex {  },
+
+    #[snafu(display("Parsing Error: {}", source))]
+    ChronoParseError { source: chrono::format::ParseError },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
