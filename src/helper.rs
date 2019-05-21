@@ -13,3 +13,12 @@ pub fn join_strings(strings: impl Iterator<Item=String>, sep: &str) -> String {
         .zip(1..)
         .fold(String::new(), fold_strings(sep))
 }
+
+pub fn parse_time(string: &str) -> chrono::ParseResult<chrono::NaiveTime> {
+    let time = if let Ok(time) = chrono::NaiveTime::parse_from_str(string, "%H:%M:%S") {
+        time
+    } else {
+        chrono::NaiveTime::parse_from_str(string, "%H:%M")?
+    };
+    Ok(time)
+}
