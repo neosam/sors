@@ -33,7 +33,11 @@ impl<'a> ClockEditCli<'a> {
                 return Err(Box::new(Error::UnsufficientInput {}));
             };
             if let Some(start_str) = splitted_line.next() {
-                let time = chrono::NaiveTime::parse_from_str(start_str, "%H:%M:%S").unwrap();
+                let time = if let Ok(time) = chrono::NaiveTime::parse_from_str(start_str, "%H:%M:%S") {
+                    time
+                } else {
+                    chrono::NaiveTime::parse_from_str(start_str, "%H:%M")?
+                };
                 state.clockedit.set_start_time(i - 1, time)?;
             }
             Ok(false)
@@ -47,7 +51,11 @@ impl<'a> ClockEditCli<'a> {
                 return Err(Box::new(Error::UnsufficientInput {}));
             };
             if let Some(end_str) = splitted_line.next() {
-                let time = chrono::NaiveTime::parse_from_str(end_str, "%H:%M:%S").unwrap();
+                let time = if let Ok(time) = chrono::NaiveTime::parse_from_str(end_str, "%H:%M:%S") {
+                    time
+                } else {
+                    chrono::NaiveTime::parse_from_str(end_str, "%H:%M")?
+                };
                 state.clockedit.set_end_time(i - 1, time)?;
             }
             Ok(false)
