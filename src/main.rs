@@ -350,7 +350,8 @@ fn main() {
     terminal.register_command("cle", Box::new(|state: &mut State, _| {
         let clockeditcli = ClockEditCli {
             clockedit: state.doc.create_clock_edit(Local::today()),
-            apply_result: ExitAction::Cancel
+            apply_result: ExitAction::Cancel,
+            doc: &state.doc,
         };
         let final_value = clockeditcli.run();
         if final_value.apply_result == ExitAction::Apply {

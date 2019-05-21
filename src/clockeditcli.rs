@@ -1,6 +1,8 @@
 use crate::terminal::*;
 use crate::clockedit::*;
 use crate::error::*;
+use crate::doc::*;
+use crate::helper::*;
 use std::io::Write;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -10,12 +12,13 @@ pub enum ExitAction {
 }
 
 #[derive(Debug, Clone)]
-pub struct ClockEditCli {
+pub struct ClockEditCli<'a> {
     pub clockedit: ClockEdit,
-    pub apply_result: ExitAction
+    pub apply_result: ExitAction,
+    pub doc: &'a Doc,
 }
 
-impl ClockEditCli {
+impl<'a> ClockEditCli<'a> {
     pub fn run(self) -> Self {
         let mut terminal = Terminal::new(self);
         terminal.register_command("cancel", Box::new(|_, _| {
@@ -58,15 +61,15 @@ impl ClockEditCli {
                 let start = &clock.start;
                 let end = clock.end.map(|end| format!("{}", end)).unwrap_or("(none)".to_string());
                 let comment = clock.comment.clone().map(|comment| comment).unwrap_or("(none)".to_string());
-                /*let task_str = if let Some(task_id) = clock.task_id {
+                let task_str = if let Some(task_id) = clock.task_id {
                     let path = state.doc.path(&task_id);
                     join_strings(path.iter()
                         .map(|task_id| state.doc.get(task_id))
                         .map(|task| task.title.clone()), " -> ")
                 } else {
                     "(none)".to_string()
-                };*/
-                println!("{}: {} - {}:\n Comment: {}", i, start, end, comment);
+                };
+                println!("{}: {} - {}:\n Task: {}\n Comment: {}", i, start, end, task_str, comment);
             }
             Ok(false)
         }));
