@@ -380,6 +380,13 @@ impl Doc {
             .filter(|clock| clock.start.date() == date)
             .map(|clock| clock.clone()).collect()
     }
+
+    /// Get the clocks of the given date.
+    pub fn range_clock(&self, start: Date<Local>, end: Date<Local>) -> Vec<Rc<Clock>> {
+        self.clocks.values()
+            .filter(|clock| clock.start.date() >= start && clock.start.date() <= end)
+            .cloned().collect()
+    }
 }
 
 

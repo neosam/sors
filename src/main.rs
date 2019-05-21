@@ -295,48 +295,13 @@ fn main() {
     terminal.register_command("taskclock", Box::new(|state: &mut State, _| {
         let mut clocks = state.doc.task_clock(&state.wt);
         clocks.sort();
-        let overall_duration = clocks.iter()
-            .map(|clock| clock.duration())
-            .fold(chrono::Duration::zero(), |acc, new| acc + new);
-        for clock in clocks.iter() {
-            let start = &clock.start;
-            let end = clock.end.map(|end| format!("{}", end)).unwrap_or("(none)".to_string());
-            let comment = clock.comment.clone().map(|comment| comment).unwrap_or("(none)".to_string());
-            let task_str = if let Some(task_id) = clock.task_id {
-                let path = state.doc.path(&task_id);
-                join_strings(path.iter()
-                    .map(|task_id| state.doc.get(task_id))
-                    .map(|task| task.title.clone()), " -> ")
-            } else {
-                String::new()
-            };
-            println!("{} - {}:\n {}\n Comment: {}", start, end, task_str, comment);
-        }
-        println!("{}", overall_duration.print());
+        display_clocks(&clocks, &state.doc);
         Ok(false)
     }));
     terminal.register_command("dayclock", Box::new(|state: &mut State, _| {
         let mut clocks = state.doc.day_clock(Local::today());
         clocks.sort();
-        let overall_duration = clocks.iter()
-            .map(|clock| clock.duration())
-            .fold(chrono::Duration::zero(), |acc, new| acc + new);
-
-        for clock in clocks.iter() {
-            let start = &clock.start;
-            let end = clock.end.map(|end| format!("{}", end)).unwrap_or("(none)".to_string());
-            let comment = clock.comment.clone().map(|comment| comment).unwrap_or("(none)".to_string());
-            let task_str = if let Some(task_id) = clock.task_id {
-                let path = state.doc.path(&task_id);
-                join_strings(path.iter()
-                    .map(|task_id| state.doc.get(task_id))
-                    .map(|task| task.title.clone()), " -> ")
-            } else {
-                "(none)".to_string()
-            };
-            println!("{} - {}:\n Task: {}\n Comment: {}", start, end, task_str, comment);
-        }
-        println!("{}", overall_duration.print());
+        display_clocks(&clocks, &state.doc);
         Ok(false)
     }));
     terminal.register_command("autosave", Box::new(|state: &mut State, _| {
@@ -361,7 +326,20 @@ fn main() {
         }
         Ok(false)
     }));
-
+    terminal.register_command("rangeclock", Box::new(|state: &mut State, cmd: &str| {
+        let mut split_cmd = cmd.split(" ");
+        split_cmd.next();
+        if let Some(index_str) = split_cmd.next() {
+            if let Ok(i) = index_str.parse() {
+                let end = Local::today();
+                let duration = chrono::Duration::days(i);
+                let start = end - duration;
+                let mut clocks = state.doc.range_clock(start, end);
+                display_clocks(&clocks, &state.doc);
+            }
+        }
+        Ok(false)
+    }));
     let mut input = String::new();
     loop {
         print!("> ");
