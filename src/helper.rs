@@ -42,7 +42,7 @@ pub fn display_clocks(clocks: &Vec<Rc<Clock>>, doc: &Doc) {
         let comment = clock.comment.clone().map(|comment| comment).unwrap_or("(none)".to_string());
         let task_str = if let Some(task_id) = clock.task_id {
             let path = doc.path(&task_id);
-            join_strings(path.iter()
+            join_strings(path.iter().rev()
                 .map(|task_id| doc.get(task_id))
                 .map(|task| task.title.clone()), " -> ")
         } else {
