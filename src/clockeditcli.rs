@@ -3,7 +3,11 @@ use crate::clockedit::*;
 use crate::error::*;
 use crate::doc::*;
 use crate::helper::*;
+use crate::statics;
 use std::io::Write;
+
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExitAction {
@@ -74,16 +78,26 @@ impl<'a> ClockEditCli<'a> {
             Ok(false)
         }));
 
-        let mut input = String::new();
+        let mut rl = Editor::<()>::new();
+        if rl.load_history(&*statics::CLOCK_HISTORY_FILE).is_err() {
+            println!("No previous history.");
+        }
         loop {
-            print!("clock edit > ");
-            std::io::stdout().flush().expect("Couldn't flush stdout");
-            std::io::stdin().read_line(&mut input).expect("Error while reading user input");
-            let exit = terminal.run_command(&input);
-            if exit {
-                break;
+            match rl.readline("clockedit > ") {
+                Ok(input) => {
+                    let exit = terminal.run_command(&input);
+                    rl.add_history_entry(input);
+                    if exit {
+                        break;
+                    }
+                },
+                Err(ReadlineError::Eof) => break,
+                Err(ReadlineError::Interrupted) => break,
+                Err(err) => println!("Error: {}", err),
             }
-            input.clear();
+        }
+        if let Err(err) = rl.save_history(&*statics::CLOCK_HISTORY_FILE) {
+            println!("Failed to save history: {}", err);
         }
         terminal.state
     }
