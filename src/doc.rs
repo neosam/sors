@@ -206,6 +206,29 @@ impl Doc {
         self.map.values().find(|task| task.children.iter().any(|child_id| child_id == task_ref)).map(|task| task.id.clone())
     }
 
+    /// Checks if the first given task is a child or the second task or if it's
+    /// the task itself.
+    pub fn is_in_hierarchy_of(&self, child_task: &Uuid, parent_task: &Uuid) -> bool {
+        let mut tmp_task = child_task.clone();
+        let mut counter = 0;
+        loop {
+            // In case of a loop (which hopefully doesn't happen), break after
+            // 200 iterations.
+            if counter == 200 {
+                return false;
+            }
+            counter += 1;
+            if tmp_task == *parent_task {
+                return true;
+            }
+            if let Some(new_parent) = self.find_parent(&tmp_task) {
+                tmp_task = new_parent.clone();
+            } else {
+                return false;
+            }
+        }
+    }
+
     /// Get all tasks, from the given one to the root.
     pub fn path(&self, task_ref: &Uuid) -> Vec<Uuid> {
         let mut res = Vec::new();
@@ -375,16 +398,30 @@ impl Doc {
     }
     
     /// Get the clocks for the given date.
-    pub fn day_clock(&self, date: Date<Local>) -> Vec<Rc<Clock>> {
+    pub fn day_clock(&self, date: Date<Local>, main_task: impl Into<Option<Uuid>>) -> Vec<Rc<Clock>> {
+        let main_task = main_task.into();
         self.clocks.values()
             .filter(|clock| clock.start.date() == date)
+            .filter(|clock|
+                if let Some(clock_task) = clock.task_id {
+                    if let Some(main_task) = main_task {
+                        self.is_in_hierarchy_of(&clock_task, &main_task)
+                    } else { true }
+                } else { true })
             .map(|clock| clock.clone()).collect()
     }
 
     /// Get the clocks of the given date.
-    pub fn range_clock(&self, start: Date<Local>, end: Date<Local>) -> Vec<Rc<Clock>> {
+    pub fn range_clock(&self, start: Date<Local>, end: Date<Local>, main_task: impl Into<Option<Uuid>>) -> Vec<Rc<Clock>> {
+        let main_task = main_task.into();
         self.clocks.values()
             .filter(|clock| clock.start.date() >= start && clock.start.date() <= end)
+            .filter(|clock|
+                if let Some(clock_task) = clock.task_id {
+                    if let Some(main_task) = main_task {
+                        self.is_in_hierarchy_of(&clock_task, &main_task)
+                    } else { true }
+                } else { true })
             .cloned().collect()
     }
 }

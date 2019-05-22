@@ -302,7 +302,7 @@ fn main() {
         Ok(false)
     }));
     terminal.register_command("dayclock", Box::new(|state: &mut State, _| {
-        let mut clocks = state.doc.day_clock(Local::today());
+        let mut clocks = state.doc.day_clock(Local::today(), state.wt);
         clocks.sort();
         display_clocks(&clocks, &state.doc);
         Ok(false)
@@ -337,7 +337,7 @@ fn main() {
                 let end = Local::today();
                 let duration = chrono::Duration::days(i);
                 let start = end - duration;
-                let mut clocks = state.doc.range_clock(start, end);
+                let clocks = state.doc.range_clock(start, end, state.wt);
                 display_clocks(&clocks, &state.doc);
             }
         }
