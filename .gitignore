@@ -2,3 +2,6 @@
 **/*.rs.bk
 .task.md
 tasks.json
+.DS_Store
+.vscode
+html/
