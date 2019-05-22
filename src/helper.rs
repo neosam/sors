@@ -32,6 +32,10 @@ pub fn display_clocks(clocks: &Vec<Rc<Clock>>, doc: &Doc) {
     let overall_duration = clocks.iter()
         .map(|clock| clock.duration())
         .fold(chrono::Duration::zero(), |acc, new| acc + new);
+    let mut clocks = clocks.clone();
+    clocks.sort();
+    let mut current_day = None;
+    let mut day_duration = chrono::Duration::zero();
     for clock in clocks.iter() {
         let start = &clock.start;
         let end = clock.end.map(|end| format!("{}", end)).unwrap_or("(none)".to_string());
@@ -42,9 +46,24 @@ pub fn display_clocks(clocks: &Vec<Rc<Clock>>, doc: &Doc) {
                 .map(|task_id| doc.get(task_id))
                 .map(|task| task.title.clone()), " -> ")
         } else {
-            String::new()
+            "(none)".to_string()
         };
-        println!("{} - {}:\n {}\n Comment: {}", start, end, task_str, comment);
+        let day = start.date();
+        if Some(day) != current_day {
+            println!("--- {} ---", day);
+        }
+        println!("{} - {}:\n Task: {}\n Comment: {}", start, end, task_str, comment);
+        if Some(day) != current_day {
+            if current_day.is_some() {
+                println!("Day duration: {}", day_duration.print());
+                println!();
+            }
+            day_duration = chrono::Duration::zero();
+            current_day = Some(day);
+        }
+        day_duration = day_duration + clock.duration();
     }
-    println!("{}", overall_duration.print());
+    println!("Day duration: {}", day_duration.print());
+    println!();
+    println!("Overall duration in time range: {}", overall_duration.print());
 }

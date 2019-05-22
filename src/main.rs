@@ -12,6 +12,9 @@ pub mod clockedit;
 pub mod clockeditcli;
 pub mod helper;
 
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
+
 use std::env::var;
 use uuid::Uuid;
 use std::io::Write;
@@ -340,20 +343,31 @@ fn main() {
         }
         Ok(false)
     }));
-    let mut input = String::new();
+    let mut rl = Editor::<()>::new();
+    if rl.load_history(&*statics::HISTORY_FILE).is_err() {
+        println!("No previous history.");
+    }
+
     loop {
-        print!("> ");
-        std::io::stdout().flush().expect("Couldn't flush stdout");
-        std::io::stdin().read_line(&mut input).expect("Error while reading user input");
-        let exit = terminal.run_command(&input);
-        if Autosave::OnCommand == terminal.state.autosave {
-            if let Err(err) = terminal.state.doc.save(&main_file_path) {
-                println!("Couldn't save the file, sorry: {}", err);
-            }
+        match rl.readline("> ") {
+            Ok(input) => {
+                let exit = terminal.run_command(&input);
+                if Autosave::OnCommand == terminal.state.autosave {
+                    if let Err(err) = terminal.state.doc.save(&main_file_path) {
+                        println!("Couldn't save the file, sorry: {}", err);
+                    }
+                }
+                rl.add_history_entry(input);
+                if exit {
+                    break;
+                }
+            },
+            Err(ReadlineError::Eof) => break,
+            Err(ReadlineError::Interrupted) => break,
+            Err(err) => println!("Error: {}", err),
         }
-        if exit {
-            break;
-        }
-        input.clear();
+    }
+    if let Err(err) = rl.save_history(&*statics::HISTORY_FILE) {
+        println!("Failed to save history: {}", err);
     }
 }
