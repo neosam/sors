@@ -229,6 +229,34 @@ impl Doc {
         }
     }
 
+    /// Get the i_th child of the given task
+    /// 
+    /// Returns None if the i is out of range.
+    pub fn task_child(&self, task_id: &Uuid, i: usize) -> Option<Uuid> {
+        let task = self.get(task_id);
+        if i < task.children.len() {
+            Some(task.children[i].clone())
+        } else {
+            None
+        }
+    }
+
+    /// Get the first child of the given task which has the prefix in the title.
+    /// 
+    /// Returns None if prefix matches no children.
+    pub fn task_child_prefix(&self, task_id: &Uuid, prefix: &str) -> Option<Uuid> {
+        let task = self.get(task_id);
+        let prefix = prefix.to_lowercase().replace(" ", "_");
+        for child in task.children.iter() {
+            let child_task = self.get(child);
+            let title = child_task.title.to_lowercase().replace(" ", "_");
+            if title.starts_with(&prefix) {
+                return Some(child.clone());
+            }
+        }
+        None
+    }
+
     /// Get all tasks, from the given one to the root.
     pub fn path(&self, task_ref: &Uuid) -> Vec<Uuid> {
         let mut res = Vec::new();

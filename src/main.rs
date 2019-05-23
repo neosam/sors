@@ -132,8 +132,8 @@ fn main() {
     terminal.register_command("cd", Box::new(|state: &mut State, cmd: &str| {
         let mut split = cmd.split(" ");
         split.next();
-        if let Some(child) = split.next() {
-            if child == ".." {
+        if let Some(path) = split.next() {
+            /*if child == ".." {
                 if let Some(parent) = state.parents.pop() {
                     state.wt = parent;
                 }
@@ -143,6 +143,11 @@ fn main() {
                 state.wt = child_id;
             } else if let Ok(id) = Uuid::parse_str(child) {
                 state.wt = id.clone();
+            }*/
+            if let Some(child) = state.uuid_for_path(path) {
+                state.wt = child.clone();
+            } else {
+                println!("Couldn't resolve path");
             }
         } else {
             state.wt = state.doc.root.clone();
