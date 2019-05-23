@@ -1,15 +1,19 @@
 [package]
-name = "todoapp3"
-version = "0.1.0"
-authors = ["neosam <neosam+github@posteo.de>"]
+name = "sors"
+version = "0.0.1"
+authors = ["Simon Goller <neosam+github@posteo.de>"]
 edition = "2018"
+description = "A standalone organization system to organize and track tasks"
+repository = "https://github.com/neosam/sors"
+keywords = ["todo", "task", "gtd", "timetrack"]
+license = "MIT/Apache-2.0"
 
 [lib]
-name = "todoapp3"
+name = "sors"
 path = "src/lib.rs"
 
 [[bin]]
-name = "todoapp3-cli"
+name = "sors-cli"
 path = "src/main.rs"
 
 [dependencies]
