@@ -191,21 +191,21 @@ fn main() {
         let mut split = cmd.split(" ");
         split.next();
         let dest_id = {
-            if let Some(dest_string) = split.next() {
-                if let Ok(dest_id) = Uuid::parse_str(dest_string) {
+            if let Some(path) = split.next() {
+                if let Some(dest_id) = state.uuid_for_path(path) {
                     dest_id.clone()
                 } else {
                     println!("Error while parsing first uuid");
                     return Ok(false)
                 }
             } else {
-                println!("No first UUID specified");
+                println!("No first path specified");
                 return Ok(false)
             }
         };
         let to_id = {
-            if let Some(to_string) = split.next() {
-                if let Ok(to_id) = Uuid::parse_str(to_string) {
+            if let Some(path) = split.next() {
+                if let Some(to_id) = state.uuid_for_path(path) {
                     to_id.clone()
                 } else {
                     println!("Error while parsing second uuid");
