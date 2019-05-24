@@ -133,17 +133,6 @@ fn main() {
         let mut split = cmd.split(" ");
         split.next();
         if let Some(path) = split.next() {
-            /*if child == ".." {
-                if let Some(parent) = state.parents.pop() {
-                    state.wt = parent;
-                }
-            } else if let Ok(i) = child.parse::<usize>() {
-                let child_id = state.doc.get(&state.wt).children[i - 1];
-                state.parents.push(state.wt.clone());
-                state.wt = child_id;
-            } else if let Ok(id) = Uuid::parse_str(child) {
-                state.wt = id.clone();
-            }*/
             if let Some(child) = state.uuid_for_path(path) {
                 state.wt = child.clone();
             } else {
@@ -186,12 +175,14 @@ fn main() {
     terminal.register_command("rm", Box::new(|state: &mut State, cmd: &str| {
         let mut split = cmd.split(" ");
         split.next();
-        if let Some(child) = split.next() {
-            if let Ok(i) = child.parse::<usize>() {
-                let mut task = state.doc.get(&state.wt);
-                let child_id = state.doc.get(&state.wt).children[i - 1];
-                task.remove_child(&child_id);
-                state.doc.upsert(task);
+        if let Some(path) = split.next() {
+            if let Some(child_id) = state.uuid_for_path(path) {
+                if let Some(parent) = state.doc.find_parent(&child_id) {
+                    let mut task = state.doc.get(&parent);
+                    //let child_id = state.doc.get(&state.wt).children[i - 1];
+                    task.remove_child(&child_id);
+                    state.doc.upsert(task);
+                }
             }
         }
         Ok(false)
