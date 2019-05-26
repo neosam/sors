@@ -33,14 +33,7 @@ use helper::*;
 use snafu::{Snafu};
 
 
-#[derive(Debug, Snafu)]
-#[snafu(visibility = "pub")]
-pub enum CliError {
-    #[snafu(display("Couldn't parse: {}", msg))]
-    ParseError { msg: String },
-}
 
-pub type CliResult<T, E = CliError> = std::result::Result<T, E>;
 
 
 trait DurationPrint {
@@ -310,8 +303,15 @@ fn main() {
         display_clocks(&clocks, &state.doc);
         Ok(false)
     }));
-    terminal.register_command("dayclock", Box::new(|state: &mut State, _| {
-        let mut clocks = state.doc.day_clock(Local::today(), state.wt);
+    terminal.register_command("dayclock", Box::new(|state: &mut State, cmd: &str| {
+        let mut cmd_split = cmd.split(" ");
+        cmd_split.next();
+        let date = if let Some(param) = cmd_split.next() {
+            parse_date(param)?
+        } else {
+            Local::today()
+        };
+        let mut clocks = state.doc.day_clock(date, state.wt);
         clocks.sort();
         display_clocks(&clocks, &state.doc);
         Ok(false)
@@ -328,20 +328,7 @@ fn main() {
         let mut cmd_split = cmd.split(" ");
         cmd_split.next();
         let date = if let Some(param) = cmd_split.next() {
-            if param.starts_with("-") {
-                match (&param[1..]).parse::<i64>() {
-                    Ok(offset) => Local::today() - chrono::Duration::days(offset),
-                    Err(err) => return Err(Box::new(CliError::ParseError { msg: format!("{}", err) })),
-                }
-            } else if let Ok(naive_date) = chrono::NaiveDate::parse_from_str(param, "%Y-%m-%d") {
-                if let Some(date) = Local.from_local_date(&naive_date).earliest() {
-                    date
-                } else {
-                    return Err(Box::new(CliError::ParseError { msg: "Couldn't apply timezone".to_string() }))
-                }
-            } else {
-                return Err(Box::new(CliError::ParseError { msg: "Couldn't parse argument format".to_string() }))
-            } 
+            parse_date(param)?
         } else {
             Local::today()
         };

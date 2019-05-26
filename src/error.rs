@@ -27,3 +27,14 @@ pub enum Error {
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub")]
+pub enum CliError {
+    #[snafu(display("Couldn't parse: {}", msg))]
+    ParseError { msg: String },
+}
+
+pub type CliResult<T, E = CliError> = std::result::Result<T, E>;

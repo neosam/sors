@@ -1,7 +1,11 @@
 use crate::doc::*;
 use crate::clock::*;
+use crate::error::*;
 use crate::DurationPrint;
 use std::rc::Rc;
+use chrono::Local;
+use chrono::TimeZone;
+use chrono::Date;
 
 pub fn fold_strings<'a>(sep: &'a str) -> impl FnMut(String, (String, usize)) -> String + 'a {
     move | mut acc, (item, i) | {
@@ -66,4 +70,21 @@ pub fn display_clocks(clocks: &Vec<Rc<Clock>>, doc: &Doc) {
     println!("Day duration: {}", day_duration.print());
     println!();
     println!("Overall duration in time range: {}", overall_duration.print());
+}
+
+pub fn parse_date(date_str: &str) -> CliResult<Date<Local>> {
+    Ok(if date_str.starts_with("-") {
+        match (&date_str[1..]).parse::<i64>() {
+            Ok(offset) => Local::today() - chrono::Duration::days(offset),
+            Err(err) => return Err(CliError::ParseError { msg: format!("{}", err) }),
+        }
+    } else if let Ok(naive_date) = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+        if let Some(date) = Local.from_local_date(&naive_date).earliest() {
+            date
+        } else {
+            return Err(CliError::ParseError { msg: "Couldn't apply timezone".to_string() })
+        }
+    } else {
+        return Err(CliError::ParseError { msg: "Couldn't parse argument format".to_string() })
+    })
 }
