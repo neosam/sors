@@ -56,6 +56,20 @@ impl<'a> ClockEditCli<'a> {
             }
             Ok(false)
         }));
+        terminal.register_command("enddate", Box::new(|state: &mut ClockEditCli, line: &str| {
+            let mut splitted_line = line.split(" ");
+            splitted_line.next();
+            let i = if let Some(index) = splitted_line.next() {
+                index.parse::<usize>()?
+            } else {
+                return Err(Box::new(Error::UnsufficientInput {}));
+            };
+            if let Some(end_str) = splitted_line.next() {
+                let date = parse_date(end_str)?;
+                state.clockedit.set_end_date(i - 1, date)?;
+            }
+            Ok(false)
+        }));
         terminal.register_command("apply", Box::new(|state: &mut ClockEditCli, _| {
             state.apply_result = ExitAction::Apply;
             Ok(true)

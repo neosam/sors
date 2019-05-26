@@ -64,6 +64,15 @@ impl ClockEdit {
             }
         })
     }
+    pub fn set_end_date(&mut self, i: usize, new_end: Date<Local>) -> Result<()> {
+        self.modify_clock(i, move |clock: &mut Rc<Clock>| {
+            if let Some(end) = clock.end {
+                if let Some(new_end) = new_end.and_time(end.time()) {
+                    clock.set_end(new_end);
+                }
+            }
+        })
+    }
 }
 
 impl Doc {
