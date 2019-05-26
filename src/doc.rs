@@ -162,12 +162,12 @@ impl Doc {
     /// 
     /// # Panic
     /// Panics if no task does exist.
-    pub fn get(&self, id: &Uuid) -> Rc<Task> {
-        self.map.get(id).unwrap().clone()
+    pub fn get(&self, id: &Uuid) -> Result<Rc<Task>> {
+        self.map.get(id).map(|task| task.clone()).ok_or(Error::TaskUuidNotFound {})
     }
 
     /// Get the root task.
-    pub fn get_root(&self) -> Rc<Task> {
+    pub fn get_root(&self) -> Result<Rc<Task>> {
         self.get(&self.root)
     }
 
@@ -182,21 +182,23 @@ impl Doc {
     /// 
     /// # Panic
     /// Panics if no id for the task exists.
-    pub fn modify_task<F>(&mut self, id: &Uuid, func: F)
-            where F: Fn(&mut Rc<Task>) {
-        let mut task = self.get(id);
+    pub fn modify_task<F>(&mut self, id: &Uuid, func: F) -> Result<()>
+            where F: Fn(&mut Rc<Task>) -> Result<(), Box<std::error::Error>> {
+        let mut task = self.get(id)?;
         Rc::make_mut(&mut task);
-        func(&mut task);
+        func(&mut task).context(CustomError)?;
         self.upsert(task);
+        Ok(())
     }
 
     /// Add a new task as child of the given parent id.
     /// 
     /// # Panic
     /// Panics if the id of the parent task doesn't exist.
-    pub fn add_subtask(&mut self, task: Rc<Task>, parent_ref: &Uuid) {
-        self.modify_task(parent_ref, |parent| { parent.add_child(task.id.clone()); });
+    pub fn add_subtask(&mut self, task: Rc<Task>, parent_ref: &Uuid) -> Result<()> {
+        self.modify_task(parent_ref, |parent| { parent.add_child(task.id.clone()); Ok(()) })?;
         self.upsert(task);
+        Ok(())
     }
 
     /// Return the parent of the given task.
@@ -233,7 +235,7 @@ impl Doc {
     /// 
     /// Returns None if the i is out of range.
     pub fn task_child(&self, task_id: &Uuid, i: usize) -> Option<Uuid> {
-        let task = self.get(task_id);
+        let task = self.get(task_id).ok()?;
         if i < task.children.len() {
             Some(task.children[i].clone())
         } else {
@@ -245,10 +247,10 @@ impl Doc {
     /// 
     /// Returns None if prefix matches no children.
     pub fn task_child_prefix(&self, task_id: &Uuid, prefix: &str) -> Option<Uuid> {
-        let task = self.get(task_id);
+        let task = self.get(task_id).ok()?;
         let prefix = prefix.to_lowercase().replace(" ", "_");
         for child in task.children.iter() {
-            let child_task = self.get(child);
+            let child_task = self.get(child).ok()?;
             let title = child_task.title.to_lowercase().replace(" ", "_");
             if title.starts_with(&prefix) {
                 return Some(child.clone());
@@ -276,9 +278,9 @@ impl Doc {
     /// 
     /// # Panic
     /// Panics if the task id is not found.
-    pub fn to_html(&self, task_ref: &Uuid) -> String {
+    pub fn to_html(&self, task_ref: &Uuid) -> Result<String> {
         let mut html = String::new();
-        let task = self.get(task_ref);
+        let task = self.get(task_ref)?;
         html.push_str("<!doctype html><html><head><link rel=\"stylesheet\" href=\"https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css\" integrity=\"sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T\" crossorigin=\"anonymous\"></head><body><div class=\"container\">");
 
         let mut breadcrumb_item_opn = Some(task_ref.clone());
@@ -292,21 +294,22 @@ impl Doc {
             }
         }
         breadcrumb_data.iter().rev().zip(1..).for_each(|(breadcrumb_ref, i)| {
-            let task = self.get(breadcrumb_ref);
-            if i > 1 {
-                html.push_str(" -> ");
+            if let Ok(task) = self.get(breadcrumb_ref) {
+                if i > 1 {
+                    html.push_str(" -> ");
+                }
+                html.push_str(&format!("<a href=\"{}.html\">{}</a>", breadcrumb_ref, task.title));
             }
-            html.push_str(&format!("<a href=\"{}.html\">{}</a>", breadcrumb_ref, task.title));
         });
 
-        let (done, all_subtasks) = self.progress_summary(task_ref);
+        let (done, all_subtasks) = self.progress_summary(task_ref)?;
         html.push_str(&format!("[{}/{}]", done, all_subtasks));
 
         html.push_str(&markdown::to_html(&task.body));
         html.push_str("<hr/>");
         html.push_str("<ul>");
         for child in task.children.iter() {
-            let child_task = self.get(child);
+            let child_task = self.get(child)?;
             html.push_str("<li><a href=\"");
             html.push_str(&child.to_string());
             html.push_str(".html\">");
@@ -321,7 +324,7 @@ impl Doc {
         }
         html.push_str("</ul>");
         html.push_str("</div></body></html>");
-        html
+        Ok(html)
     }
 
     /// Summary how many children are done vs how many have any progress state.
@@ -330,14 +333,15 @@ impl Doc {
     /// the task is not done in the first tuple entry and the count of children
     /// which contain any progress field.  Actually, this is the current progress
     /// state of the task: todo/all.
-    pub fn progress_summary(&self, task_ref: &Uuid) -> (i32, i32) {
-        self.get(task_ref)
+    pub fn progress_summary(&self, task_ref: &Uuid) -> Result<(i32, i32)> {
+        Ok(self.get(task_ref)?
             .children.iter()
-            .filter_map(|child| self.get(child).progress)
+            .filter_map(|child_ref| self.get(child_ref).ok())
+            .filter_map(|child| child.progress)
             .fold((0, 0), |(acc_done, acc_sum), progress| (
                 acc_done + if progress.done() { 1 } else { 0 },
                 acc_sum + 1
-            ))
+            )))
     }
 
     /// Get the clock which is under the name.
@@ -457,27 +461,28 @@ impl Doc {
 
 
 
-pub fn rec_print(doc: &mut Doc, task_id: &Uuid, level: usize, max_depth: usize) {
+pub fn rec_print(doc: &mut Doc, task_id: &Uuid, level: usize, max_depth: usize) -> Result<()> {
     if level >= max_depth {
-        return;
+        return Ok(());
     }
-    let task = doc.get(task_id);
+    let task = doc.get(task_id)?;
     for _ in 0..level {
         print!(" ");
     }
     print!("* ");
     println!("{} {}", task.id, task.title);
     for child_id in task.children.iter() {
-        rec_print(doc, child_id, level + 1, max_depth);
+        rec_print(doc, child_id, level + 1, max_depth)?;
     }
+    Ok(())
 }
 
 pub fn dump_html_rec(doc: &Doc, dir: &Path, task_ref: &Uuid) -> Result<()> {
-    let task = doc.get(task_ref);
+    let task = doc.get(task_ref)?;
     for child in task.children.iter() {
         dump_html_rec(doc, dir, child)?;
     }
-    let task_html = doc.to_html(task_ref);
+    let task_html = doc.to_html(task_ref)?;
     let filename = dir.join(format!("{}.html", task_ref));
     println!("{}", filename.to_str().unwrap_or("N/A"));
     let mut html_file = File::create(filename).context(IO)?;

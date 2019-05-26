@@ -82,6 +82,7 @@ impl<'a> ClockEditCli<'a> {
                     let path = state.doc.path(&task_id);
                     join_strings(path.iter()
                         .map(|task_id| state.doc.get(task_id))
+                        .filter_map(|task| task.ok())
                         .map(|task| task.title.clone()), " -> ")
                 } else {
                     "(none)".to_string()

@@ -10,6 +10,12 @@ pub enum Error {
     #[snafu(display("Serde Serialize Error: {}", source))]
     SerdeSerializationError { source: serde_json::error::Error },
 
+    #[snafu(display("Task UUID not found"))]
+    TaskUuidNotFound {  },
+
+    #[snafu(display("Custom error:  "))]
+    CustomError { source: Box<std::error::Error> },
+
     /*#[snafu(display("From String Error: {}", source))]
     SerdeSerializationError { source: std::str::From },
 */

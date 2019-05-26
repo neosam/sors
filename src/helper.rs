@@ -48,6 +48,7 @@ pub fn display_clocks(clocks: &Vec<Rc<Clock>>, doc: &Doc) {
             let path = doc.path(&task_id);
             join_strings(path.iter().rev()
                 .map(|task_id| doc.get(task_id))
+                .filter_map(|task| task.ok())
                 .map(|task| task.title.clone()), " -> ")
         } else {
             "(none)".to_string()
