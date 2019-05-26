@@ -20,6 +20,7 @@ use uuid::Uuid;
 use std::io::Write;
 use std::path::Path;
 use chrono::Local;
+use chrono::TimeZone;
 use std::rc::Rc;
 
 use error::*;
@@ -28,6 +29,18 @@ use doc::*;
 use state::*;
 use clockeditcli::*;
 use helper::*;
+
+use snafu::{Snafu};
+
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility = "pub")]
+pub enum CliError {
+    #[snafu(display("Couldn't parse: {}", msg))]
+    ParseError { msg: String },
+}
+
+pub type CliResult<T, E = CliError> = std::result::Result<T, E>;
 
 
 trait DurationPrint {
@@ -311,9 +324,29 @@ fn main() {
         state.autosave = Autosave::ManualOnly;
         Ok(false)
     }));
-    terminal.register_command("cle", Box::new(|state: &mut State, _| {
+    terminal.register_command("cle", Box::new(|state: &mut State, cmd: &str| {
+        let mut cmd_split = cmd.split(" ");
+        cmd_split.next();
+        let date = if let Some(param) = cmd_split.next() {
+            if param.starts_with("-") {
+                match (&param[1..]).parse::<i64>() {
+                    Ok(offset) => Local::today() - chrono::Duration::days(offset),
+                    Err(err) => return Err(Box::new(CliError::ParseError { msg: format!("{}", err) })),
+                }
+            } else if let Ok(naive_date) = chrono::NaiveDate::parse_from_str(param, "%Y-%m-%d") {
+                if let Some(date) = Local.from_local_date(&naive_date).earliest() {
+                    date
+                } else {
+                    return Err(Box::new(CliError::ParseError { msg: "Couldn't apply timezone".to_string() }))
+                }
+            } else {
+                return Err(Box::new(CliError::ParseError { msg: "Couldn't parse argument format".to_string() }))
+            } 
+        } else {
+            Local::today()
+        };
         let clockeditcli = ClockEditCli {
-            clockedit: state.doc.create_clock_edit(Local::today()),
+            clockedit: state.doc.create_clock_edit(date),
             apply_result: ExitAction::Cancel,
             doc: &state.doc,
         };
