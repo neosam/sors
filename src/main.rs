@@ -198,12 +198,7 @@ fn main() {
         split.next();
         let dest_id = {
             if let Some(path) = split.next() {
-                if let Some(dest_id) = state.uuid_for_path(path) {
-                    dest_id.clone()
-                } else {
-                    println!("Error while parsing first uuid");
-                    return Ok(false)
-                }
+                state.uuid_for_path(path).ok_or(Box::new(CliError::ParseError{ msg: "First path contains errors".to_string() }))?
             } else {
                 println!("No first path specified");
                 return Ok(false)
@@ -211,12 +206,7 @@ fn main() {
         };
         let to_id = {
             if let Some(path) = split.next() {
-                if let Some(to_id) = state.uuid_for_path(path) {
-                    to_id.clone()
-                } else {
-                    println!("Error while parsing second uuid");
-                    return Ok(false)
-                }
+                state.uuid_for_path(path).ok_or(Box::new(CliError::ParseError{ msg: "First path contains errors".to_string() }))?
             } else {
                 println!("No second UUID specified");
                 return Ok(false)
