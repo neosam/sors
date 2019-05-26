@@ -13,6 +13,9 @@ pub enum Error {
     #[snafu(display("Task UUID not found"))]
     TaskUuidNotFound {  },
 
+     #[snafu(display("Child out of index"))]
+    ChildOutOfIndex {  },
+
     #[snafu(display("Custom error:  "))]
     CustomError { source: Box<std::error::Error> },
 

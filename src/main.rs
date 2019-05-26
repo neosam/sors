@@ -250,6 +250,12 @@ fn main() {
         let idx_string: &str = split.next().ok_or(Error::UnsufficientInput {})?;
         let idx_to: usize = idx_string.parse()?;
         let mut task = state.doc.get(&state.wt)?;
+        if idx_from > task.children.len() {
+            return Err(Box::new(Error::ChildOutOfIndex {}));
+        }
+        if idx_to > task.children.len() {
+            return Err(Box::new(Error::ChildOutOfIndex {}));
+        }
         let from_id = task.children[idx_from - 1];
         task.remove_child(&from_id);
         task.insert_child(from_id, idx_to - 1);
