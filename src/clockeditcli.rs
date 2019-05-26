@@ -4,7 +4,6 @@ use crate::error::*;
 use crate::doc::*;
 use crate::helper::*;
 use crate::statics;
-use std::io::Write;
 
 use rustyline::error::ReadlineError;
 use rustyline::Editor;

@@ -16,11 +16,9 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 
 use std::env::var;
-use uuid::Uuid;
 use std::io::Write;
 use std::path::Path;
 use chrono::Local;
-use chrono::TimeZone;
 use std::rc::Rc;
 
 use error::*;
@@ -29,10 +27,6 @@ use doc::*;
 use state::*;
 use clockeditcli::*;
 use helper::*;
-
-use snafu::{Snafu};
-
-
 
 
 
