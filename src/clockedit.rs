@@ -12,7 +12,7 @@ pub struct ClockEdit {
 
 impl ClockEdit {
     pub fn get_clock(&self, i: usize) -> Result<Rc<Clock>> {
-        self.clocks.get(i).map(|clock| clock.clone()).ok_or(Error::ClockOutOfIndex {})
+        self.clocks.get(i).cloned().ok_or(Error::ClockOutOfIndex {})
     }
 
     pub fn update_clock(&mut self, i: usize, clock: Rc<Clock>) -> Result<()> {
@@ -79,7 +79,7 @@ impl Doc {
     pub fn create_clock_edit(&self, date: Date<Local>) -> ClockEdit {
         let mut clocks: Vec<Rc<Clock>> = self.clocks.values()
             .filter(|clock| clock.start.date() == date)
-            .map(|clock| clock.clone())
+            .cloned()
             .collect();
         clocks.sort();
         ClockEdit {

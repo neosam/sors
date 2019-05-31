@@ -112,7 +112,7 @@ impl<T: Sized, C: CliCallbacks<T>> Cli<T, C> {
     }
 
     pub fn run_command(&mut self, line: &str) -> Result<()> {
-        if let Some(command) = line.trim().split(" ").next() {
+        if let Some(command) = line.trim().split(' ').next() {
             if let Some(func) = self.commands.get(command) {
                 func(&mut self.state, line.trim(), &mut self.callbacks)
             } else {
@@ -124,7 +124,7 @@ impl<T: Sized, C: CliCallbacks<T>> Cli<T, C> {
     }
 
     pub fn run_loop(&mut self, prompt: &str) {
-        loop {
+        while !self.callbacks.is_exit() {
             match self.callbacks.read_line(prompt) {
                 CliInputResult::Value(input) => {
                     self.callbacks.pre_exec(&mut self.state, &input);
@@ -133,15 +133,6 @@ impl<T: Sized, C: CliCallbacks<T>> Cli<T, C> {
                         Err(err) => self.callbacks.println(&format!("Error: {}", err))
                     }
                     self.callbacks.post_exec(&mut self.state, &input);
-                    /*if Autosave::OnCommand == terminal.state.autosave {
-                        if let Err(err) = terminal.state.doc.save(&main_file_path) {
-                            self.callbacks.println(&format!("Couldn't save the file, sorry: {}", err));
-                        }
-                    }
-                    rl.add_history_entry(input);*/
-                    if self.callbacks.is_exit() {
-                        break
-                    }
                 },
                 CliInputResult::Termination => break,
             }

@@ -32,7 +32,7 @@ impl std::cmp::Ord for Clock {
 
 impl Clock {
     pub fn duration(&self) -> chrono::Duration {
-        self.end.unwrap_or_else(|| Local::now()) - self.start
+        self.end.unwrap_or_else(Local::now) - self.start
     }
 }
 

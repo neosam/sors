@@ -128,10 +128,10 @@ impl CliCallbacks<State> for TerminalCallback {
 
 fn main() {
     let main_file_path = format!("{}/.tasks.json", var("HOME").unwrap());
-    let doc = Doc::load(&main_file_path).unwrap_or(Doc::new());
+    let doc = Doc::load(&main_file_path).unwrap_or_default();
     let state = State {
-        wt: doc.root.clone(),
-        doc: doc,
+        wt: doc.root,
+        doc,
         parents: Vec::new(),
         path: main_file_path.clone(),
         autosave: Autosave::ManualOnly,
@@ -147,15 +147,11 @@ fn main() {
     }));
     terminal.register_command("ls", Box::new(|state: &mut State, _, response| {
         let task = state.doc.get(&state.wt)?;
-        let mut breadcrumb_item_opn = Some(state.wt.clone());
+        let mut breadcrumb_item_opn = Some(state.wt);
         let mut breadcrumb_data = Vec::new();
-        loop {
-            if let Some(breadcrumb_item) = breadcrumb_item_opn {
-                breadcrumb_data.push(breadcrumb_item.clone());
-                breadcrumb_item_opn = state.doc.find_parent(&breadcrumb_item);
-            } else {
-                break;
-            }
+        while let Some(breadcrumb_item) = breadcrumb_item_opn {
+            breadcrumb_data.push(breadcrumb_item);
+            breadcrumb_item_opn = state.doc.find_parent(&breadcrumb_item);
         }
         breadcrumb_data.iter().rev().zip(1..).for_each(|(breadcrumb_ref, i)| {
             if let Ok(task) = state.doc.get(breadcrumb_ref) {
@@ -168,8 +164,8 @@ fn main() {
         let (done, all_subtasks) = state.doc.progress_summary(&task.id)?;
         response.println(&format!("  [{}/{}]", done, all_subtasks));
         response.println("");
-        response.println(&format!("{}", task.body));
-        response.println(&format!("--- Children: "));
+        response.println(&task.body);
+        response.println("--- Children: ");
         for (child_id, i) in task.children.iter().zip(1..) {
             let child = state.doc.get(child_id)?;
             let progress_str = if let Some(progress) = &child.progress {
@@ -192,7 +188,7 @@ fn main() {
         Ok(())
     }));
     terminal.register_command("save", Box::new(|state: &mut State, cmd: &str, _| {
-        let mut split = cmd.split(" ");
+        let mut split = cmd.split(' ');
         split.next();
         let filename = if let Some(filename) = split.next() {
             filename
@@ -203,7 +199,7 @@ fn main() {
         Ok(())
     }));
     terminal.register_command("load", Box::new(|state: &mut State, cmd: &str, _| {
-        let mut split = cmd.split(" ");
+        let mut split = cmd.split(' ');
         split.next();
         let filename = if let Some(filename) = split.next() {
             filename
@@ -211,19 +207,19 @@ fn main() {
             &state.path
         };
         let doc = Doc::load(filename).expect("Couldn't save the file");
-        let new_root = doc.root.clone();
+        let new_root = doc.root;
         state.doc = doc;
         state.wt = new_root;
         Ok(())
     }));
     terminal.register_command("cd", Box::new(|state: &mut State, cmd: &str, _| {
-        let mut split = cmd.split(" ");
+        let mut split = cmd.split(' ');
         split.next();
         if let Some(path) = split.next() {
             state.wt = state.uuid_for_path(path)
                 .ok_or(CliError::ParseError { msg: "Couldn't resolve path".to_string() })?
         } else {
-            state.wt = state.doc.root.clone();
+            state.wt = state.doc.root;
             state.parents = Vec::new();
         }
         Ok(())
@@ -259,7 +255,7 @@ fn main() {
         Ok(())
     }));
     terminal.register_command("rm", Box::new(|state: &mut State, cmd: &str, _| {
-        let mut split = cmd.split(" ");
+        let mut split = cmd.split(' ');
         split.next();
         if let Some(path) = split.next() {
             if let Some(child_id) = state.uuid_for_path(path) {
@@ -273,15 +269,15 @@ fn main() {
         Ok(())
     }));
     terminal.register_command("mv", Box::new(|state: &mut State, cmd: &str, _response| {
-        let mut split = cmd.split(" ");
+        let mut split = cmd.split(' ');
         split.next();
         let dest_id = {
             let path = split.next().ok_or(CliError::ParseError{ msg: "First path contains errors".to_string() })?;
-            state.uuid_for_path(path).ok_or(Box::new(CliError::ParseError{ msg: "First path contains errors".to_string() }))?
+            state.uuid_for_path(path).ok_or_else(|| Box::new(CliError::ParseError{ msg: "First path contains errors".to_string() }))?
         };
         let to_id = {
             let path = split.next().ok_or(CliError::ParseError{ msg: "First path contains errors".to_string() })?;
-            state.uuid_for_path(path).ok_or(Box::new(CliError::ParseError{ msg: "First path contains errors".to_string() }))?
+            state.uuid_for_path(path).ok_or_else(|| Box::new(CliError::ParseError{ msg: "First path contains errors".to_string() }))?
         };
         let parent_id = state.doc.find_parent(&dest_id)
             .ok_or(CliError::OtherError { msg: "Couldn't find parent".to_string()} )?;
@@ -295,7 +291,7 @@ fn main() {
         Ok(())
     }));
     terminal.register_command("outline", Box::new(|state: &mut State, cmd: &str, response| {
-        let mut split = cmd.split(" ");
+        let mut split = cmd.split(' ');
         split.next();
         let max_depth = if let Some(depth_str) = split.next() {
             if let Ok(max_depth) = depth_str.parse() {
@@ -314,7 +310,7 @@ fn main() {
         Ok(())
     }));
     terminal.register_command("reorder", Box::new(|state: &mut State, cmd: &str, _| {
-        let mut split = cmd.split(" ");
+        let mut split = cmd.split(' ');
         split.next();
         let idx_string: &str = split.next().ok_or(Error::UnsufficientInput {})?;
         let idx_from: usize = idx_string.parse()?;
@@ -335,7 +331,7 @@ fn main() {
     }));
     terminal.register_command("cli", Box::new(|state: &mut State, _, _| {
         state.doc.clock_new()?;
-        state.doc.clock_assign(state.wt.clone())?;
+        state.doc.clock_assign(state.wt)?;
         Ok(())
     }));
     terminal.register_command("cln", Box::new(|state: &mut State, _, _| {
@@ -343,7 +339,7 @@ fn main() {
         Ok(())
     }));
     terminal.register_command("cla", Box::new(|state: &mut State, _, _| {
-        state.doc.clock_assign(state.wt.clone())?;
+        state.doc.clock_assign(state.wt)?;
         Ok(())
     }));
     terminal.register_command("clo", Box::new(|state: &mut State, _, _| {
@@ -366,7 +362,7 @@ fn main() {
         Ok(())
     }));
     terminal.register_command("dayclock", Box::new(|state: &mut State, cmd: &str, response| {
-        let mut cmd_split = cmd.split(" ");
+        let mut cmd_split = cmd.split(' ');
         cmd_split.next();
         let date = if let Some(param) = cmd_split.next() {
             parse_date(param)?
@@ -387,7 +383,7 @@ fn main() {
         Ok(())
     }));
     terminal.register_command("cle", Box::new(|state: &mut State, cmd: &str, callbacks| {
-        let mut cmd_split = cmd.split(" ");
+        let mut cmd_split = cmd.split(' ');
         cmd_split.next();
         let date = if let Some(param) = cmd_split.next() {
             parse_date(param)?
@@ -413,7 +409,7 @@ fn main() {
         Ok(())
     }));
     terminal.register_command("rangeclock", Box::new(|state: &mut State, cmd: &str, response| {
-        let mut split_cmd = cmd.split(" ");
+        let mut split_cmd = cmd.split(' ');
         split_cmd.next();
         if let Some(index_str) = split_cmd.next() {
             if let Ok(i) = index_str.parse() {

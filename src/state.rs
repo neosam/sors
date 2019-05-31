@@ -18,12 +18,12 @@ pub struct State {
 
 impl State {
     pub fn uuid_for_path(&self, path: &str) -> Option<Uuid> {
-        let mut current_task = if path.starts_with("/") {
-            Some(self.doc.root.clone())
+        let mut current_task = if path.starts_with('/') {
+            Some(self.doc.root)
         } else {
-            Some(self.wt.clone())
+            Some(self.wt)
         };
-        let splitted_path = path.split("/");
+        let splitted_path = path.split('/');
         
         for part in splitted_path {
             if let Ok(i) = part.parse::<usize>() {
@@ -40,10 +40,8 @@ impl State {
                 }
             } else if part == "" {
                 // Empty - Do nothing
-            } else {
-                if let Some(task) = current_task {
+            } else if let Some(task) = current_task {
                     current_task = self.doc.task_child_prefix(&task, part);
-                }
             }
         }
         current_task

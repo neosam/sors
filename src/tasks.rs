@@ -35,11 +35,17 @@ pub struct Task {
     pub progress: Option<Progress>
 }
 
+impl Default for Task {
+    fn default() -> Self {
+        Task::new()
+    }
+}
+
 impl Task {
     pub fn new() -> Task {
         let root_id = Uuid::new_v4();
         Task {
-            id: root_id.clone(),
+            id: root_id,
             title: String::new(),
             body: String::new(),
             children: Vec::new(),
@@ -87,7 +93,7 @@ impl TaskMod for Rc<Task> {
             if child == child_id {
                 None
             } else {
-                Some(child.clone())
+                Some(*child)
             }
         ).collect();
         self.set_children(children);

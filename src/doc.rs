@@ -112,6 +112,12 @@ pub struct Doc {
     pub root: Uuid
 }
 
+impl Default for Doc {
+    fn default() -> Self {
+        Doc::new()
+    }
+}
+
 impl Doc {
     /// Create a new, empty document.
     /// 
@@ -127,10 +133,10 @@ impl Doc {
     pub fn new() -> Doc {
         let mut map = HashMap::new();
         let root = Task::new();
-        let root_id = root.id.clone();
-        map.insert(root_id.clone(), Rc::new(root));
+        let root_id = root.id;
+        map.insert(root_id, Rc::new(root));
         Doc {
-            map: map,
+            map,
             clocks: HashMap::default(),
             current_clock: None,
             root: root_id
@@ -139,9 +145,10 @@ impl Doc {
 
     /// Write the content to into the specified file.
     pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
-        Ok(serde_json::to_writer(
+        serde_json::to_writer(
             File::create(path).context(IO)?, self)
-            .context(SerdeSerializationError)?)
+            .context(SerdeSerializationError)?;
+        Ok(())
     }
 
     /// Load the document of hte given path and return a new doc.
@@ -162,7 +169,7 @@ impl Doc {
     /// # Panic
     /// Panics if no task does exist.
     pub fn get(&self, id: &Uuid) -> Result<Rc<Task>> {
-        self.map.get(id).map(|task| task.clone()).ok_or(Error::TaskUuidNotFound {})
+        self.map.get(id).cloned().ok_or(Error::TaskUuidNotFound {})
     }
 
     /// Get the root task.
@@ -174,7 +181,7 @@ impl Doc {
     /// 
     /// The task is identified by its id.
     pub fn upsert(&mut self, task: Rc<Task>) {
-        self.map.insert(task.id.clone(), task);
+        self.map.insert(task.id, task);
     }
 
     /// Modify the task with a function or closure
@@ -195,7 +202,7 @@ impl Doc {
     /// # Panic
     /// Panics if the id of the parent task doesn't exist.
     pub fn add_subtask(&mut self, task: Rc<Task>, parent_ref: &Uuid) -> Result<()> {
-        self.modify_task(parent_ref, |parent| { parent.add_child(task.id.clone()); Ok(()) })?;
+        self.modify_task(parent_ref, |parent| { parent.add_child(task.id); Ok(()) })?;
         self.upsert(task);
         Ok(())
     }
@@ -204,13 +211,13 @@ impl Doc {
     /// 
     /// It will be None, if not found.
     pub fn find_parent(&self, task_ref: &Uuid) -> Option<Uuid> {
-        self.map.values().find(|task| task.children.iter().any(|child_id| child_id == task_ref)).map(|task| task.id.clone())
+        self.map.values().find(|task| task.children.iter().any(|child_id| child_id == task_ref)).map(|task| task.id)
     }
 
     /// Checks if the first given task is a child or the second task or if it's
     /// the task itself.
     pub fn is_in_hierarchy_of(&self, child_task: &Uuid, parent_task: &Uuid) -> bool {
-        let mut tmp_task = child_task.clone();
+        let mut tmp_task = *child_task;
         let mut counter = 0;
         loop {
             // In case of a loop (which hopefully doesn't happen), break after
@@ -223,7 +230,7 @@ impl Doc {
                 return true;
             }
             if let Some(new_parent) = self.find_parent(&tmp_task) {
-                tmp_task = new_parent.clone();
+                tmp_task = new_parent;
             } else {
                 return false;
             }
@@ -236,7 +243,7 @@ impl Doc {
     pub fn task_child(&self, task_id: &Uuid, i: usize) -> Option<Uuid> {
         let task = self.get(task_id).ok()?;
         if i < task.children.len() {
-            Some(task.children[i].clone())
+            Some(task.children[i])
         } else {
             None
         }
@@ -252,7 +259,7 @@ impl Doc {
             let child_task = self.get(child).ok()?;
             let title = child_task.title.to_lowercase().replace(" ", "_");
             if title.starts_with(&prefix) {
-                return Some(child.clone());
+                return Some(*child);
             }
         }
         None
@@ -261,14 +268,10 @@ impl Doc {
     /// Get all tasks, from the given one to the root.
     pub fn path(&self, task_ref: &Uuid) -> Vec<Uuid> {
         let mut res = Vec::new();
-        let mut task_ref_opt = Some(task_ref.clone());
-        loop {
-            if let Some(task_ref) = task_ref_opt {
-                res.push(task_ref.clone());
-                task_ref_opt = self.find_parent(&task_ref);
-            } else {
-                break;
-            }
+        let mut task_ref_opt = Some(*task_ref);
+        while let Some(task_ref) = task_ref_opt {
+            res.push(task_ref);
+            task_ref_opt = self.find_parent(&task_ref);
         }
         res
     }
@@ -282,15 +285,11 @@ impl Doc {
         let task = self.get(task_ref)?;
         html.push_str("<!doctype html><html><head><link rel=\"stylesheet\" href=\"https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css\" integrity=\"sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T\" crossorigin=\"anonymous\"></head><body><div class=\"container\">");
 
-        let mut breadcrumb_item_opn = Some(task_ref.clone());
+        let mut breadcrumb_item_opn = Some(*task_ref);
         let mut breadcrumb_data = Vec::new();
-        loop {
-            if let Some(breadcrumb_item) = breadcrumb_item_opn {
-                breadcrumb_data.push(breadcrumb_item.clone());
-                breadcrumb_item_opn = self.find_parent(&breadcrumb_item);
-            } else {
-                break;
-            }
+        while let Some(breadcrumb_item) = breadcrumb_item_opn {
+            breadcrumb_data.push(breadcrumb_item);
+            breadcrumb_item_opn = self.find_parent(&breadcrumb_item);
         }
         breadcrumb_data.iter().rev().zip(1..).for_each(|(breadcrumb_ref, i)| {
             if let Ok(task) = self.get(breadcrumb_ref) {
@@ -348,12 +347,12 @@ impl Doc {
     /// # Error
     /// Returns an error if a clock wasn't found under the name.
     pub fn clock(&self, clock_ref: &Uuid) -> Result<Rc<Clock>> {
-        self.clocks.get(clock_ref).map(|item| item.clone()).ok_or(Error::ClockNotFound {})
+        self.clocks.get(clock_ref).cloned().ok_or(Error::ClockNotFound {})
     }
 
     /// Insert or replace the clock.
     pub fn upsert_clock(&mut self, clock: Rc<Clock>) {
-        self.clocks.insert(clock.id.clone(), clock);
+        self.clocks.insert(clock.id, clock);
     }
 
     /// Stops clocking time.
@@ -389,7 +388,7 @@ impl Doc {
             task_id: None
         });
         self.upsert_clock(clock.clone());
-        self.current_clock = Some(clock.id.clone());
+        self.current_clock = Some(clock.id);
         Ok(clock)
     }
 
@@ -425,7 +424,7 @@ impl Doc {
     pub fn task_clock(&self, task_ref: &Uuid) -> Vec<Rc<Clock>> {
         self.clocks.values()
             .filter(|clock| clock.task_id == Some(*task_ref))
-            .map(|clock| clock.clone()).collect()
+            .cloned().collect()
     }
     
     /// Get the clocks for the given date.
@@ -439,7 +438,7 @@ impl Doc {
                         self.is_in_hierarchy_of(&clock_task, &main_task)
                     } else { true }
                 } else { true })
-            .map(|clock| clock.clone()).collect()
+            .cloned().collect()
     }
 
     /// Get the clocks of the given date.
@@ -483,7 +482,7 @@ pub fn dump_html_rec<T>(doc: &Doc, dir: &Path, task_ref: &Uuid, callbacks: &mut 
     }
     let task_html = doc.to_html(task_ref)?;
     let filename = dir.join(format!("{}.html", task_ref));
-    callbacks.println(&format!("{}", filename.to_str().unwrap_or("N/A")));
+    callbacks.println(filename.to_str().unwrap_or("N/A"));
     let mut html_file = File::create(filename).context(IO)?;
     html_file.write_all(task_html.as_bytes()).context(IO)?;
     Ok(())
@@ -492,7 +491,7 @@ pub fn dump_html_rec<T>(doc: &Doc, dir: &Path, task_ref: &Uuid, callbacks: &mut 
 pub fn dump_html<T>(doc: &Doc, dir: &Path, task_ref: &Uuid, callbacks: &mut CliCallbacks<T>) -> Result<()> {
     std::fs::create_dir_all(dir).context(IO)?;
     dump_html_rec(doc, dir, task_ref, callbacks)?;
-    let filename = dir.join(format!("index.html"));
+    let filename = dir.join("index.html");
     let mut index_file = File::create(filename).context(IO)?;
     index_file.write_all(b"<!doctype html><html><head></head><body><a href=\"").context(IO)?;
     index_file.write_all(task_ref.to_string().as_bytes()).context(IO)?;

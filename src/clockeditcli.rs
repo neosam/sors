@@ -27,7 +27,7 @@ impl<'a> ClockEditCli<'a> {
             Ok(())
         }));
         terminal.register_command("start", Box::new(|state: &mut ClockEditCli, line: &str, _| {
-            let mut splitted_line = line.split(" ");
+            let mut splitted_line = line.split(' ');
             splitted_line.next();
             let i = if let Some(index) = splitted_line.next() {
                 index.parse::<usize>()?
@@ -41,7 +41,7 @@ impl<'a> ClockEditCli<'a> {
             Ok(())
         }));
         terminal.register_command("end", Box::new(|state: &mut ClockEditCli, line: &str, _| {
-            let mut splitted_line = line.split(" ");
+            let mut splitted_line = line.split(' ');
             splitted_line.next();
             let i = if let Some(index) = splitted_line.next() {
                 index.parse::<usize>()?
@@ -55,7 +55,7 @@ impl<'a> ClockEditCli<'a> {
             Ok(())
         }));
         terminal.register_command("enddate", Box::new(|state: &mut ClockEditCli, line: &str, _| {
-            let mut splitted_line = line.split(" ");
+            let mut splitted_line = line.split(' ');
             splitted_line.next();
             let i = if let Some(index) = splitted_line.next() {
                 index.parse::<usize>()?
@@ -76,8 +76,8 @@ impl<'a> ClockEditCli<'a> {
         terminal.register_command("ls", Box::new(|state: &mut ClockEditCli, _, callbacks| {
             for (clock, i) in state.clockedit.clocks.iter().zip(1..) {
                 let start = &clock.start;
-                let end = clock.end.map(|end| format!("{}", end)).unwrap_or("(none)".to_string());
-                let comment = clock.comment.clone().map(|comment| comment).unwrap_or("(none)".to_string());
+                let end = clock.end.map(|end| format!("{}", end)).unwrap_or_else(|| "(none)".to_string());
+                let comment = clock.comment.clone().map(|comment| comment).unwrap_or_else(|| "(none)".to_string());
                 let task_str = if let Some(task_id) = clock.task_id {
                     let path = state.doc.path(&task_id);
                     join_strings(path.iter()
