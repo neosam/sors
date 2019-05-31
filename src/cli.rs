@@ -4,7 +4,7 @@ use crate::error::*;
 
 pub type Result<T, E=Box<dyn std::error::Error>> = std::result::Result<T, E>;
 
-pub type Func<T, C: CliCallbacks<T>> = Box<Fn(&mut T, &str, &mut C) -> Result<()>>;
+pub type Func<T, C> = Box<Fn(&mut T, &str, &mut C) -> Result<()>>;
 
 pub enum CliInputResult {
     Value(String),
@@ -12,8 +12,8 @@ pub enum CliInputResult {
 }
 
 pub trait CliStateCallback<T> {
-    fn pre_exec(&mut self, state: &mut T, command: &str) {}
-    fn post_exec(&mut self, state: &mut T, command: &str) {}
+    fn pre_exec(&mut self, _state: &mut T, _command: &str) {}
+    fn post_exec(&mut self, _state: &mut T, _command: &str) {}
 }
 
 pub trait CliCallbacks<T> : CliStateCallback<T> {

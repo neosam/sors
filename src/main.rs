@@ -265,7 +265,6 @@ fn main() {
             if let Some(child_id) = state.uuid_for_path(path) {
                 if let Some(parent) = state.doc.find_parent(&child_id) {
                     let mut task = state.doc.get(&parent)?;
-                    //let child_id = state.doc.get(&state.wt).children[i - 1];
                     task.remove_child(&child_id);
                     state.doc.upsert(task);
                 }
@@ -273,7 +272,7 @@ fn main() {
         }
         Ok(())
     }));
-    terminal.register_command("mv", Box::new(|state: &mut State, cmd: &str, response| {
+    terminal.register_command("mv", Box::new(|state: &mut State, cmd: &str, _response| {
         let mut split = cmd.split(" ");
         split.next();
         let dest_id = {
@@ -351,7 +350,7 @@ fn main() {
         state.doc.clock_out()?;
         Ok(())
     }));
-    terminal.register_command("clc", Box::new(|state: &mut State, _, response| {
+    terminal.register_command("clc", Box::new(|state: &mut State, _, _response| {
         let mut comment = String::new();
         print!("Clock comment> ");
         std::io::stdout().flush()?;
