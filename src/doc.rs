@@ -19,10 +19,10 @@ use crate::cli::CliCallbacks;
 /// # Example
 /// 
 /// ```
-/// use todoapp3::doc::Doc;
-/// use todoapp3::tasks::Task;
-/// use todoapp3::TaskMod;
-/// use todoapp3::tasks::Progress;
+/// use sors::doc::Doc;
+/// use sors::tasks::Task;
+/// use sors::TaskMod;
+/// use sors::tasks::Progress;
 /// use std::rc::Rc;
 /// 
 /// // Initialize the doc.
@@ -30,14 +30,16 @@ use crate::cli::CliCallbacks;
 /// 
 /// // The doc now contains one single root task.  Lets edit its title and
 /// // body text.
-/// doc.modify_task(&doc.root.clone(), |task| {
+/// let root = doc.root;
+/// doc.modify_task(&root, |task| {
 ///     task
 ///         .set_title("Title of the root task")
 ///         .set_body("Some text");
+///     Ok(())
 /// });
 /// 
 /// // Now lets access the roots title.
-/// assert_eq!(doc.get_root().title, "Title of the root task");
+/// assert_eq!(doc.get_root().unwrap().title, "Title of the root task");
 /// 
 /// // Add lets generate a new task and set some title as well.
 /// let mut child1 = Rc::new(Task::new());
@@ -50,10 +52,10 @@ use crate::cli::CliCallbacks;
 /// // Now lets read the title of doc's first child.
 /// {
 ///     // Get the new root
-///     let root = doc.get_root();
+///     let root = doc.get_root().unwrap();
 ///     // Get the child.  `children` is a Vec of IDs which are
 ///     // used to get the task.
-///     let child = doc.get(&root.children[0]);
+///     let child = doc.get(&root.children[0]).unwrap();
 ///     // Read the title
 ///     assert_eq!("I'm the child", child.title);
 /// 
@@ -62,28 +64,30 @@ use crate::cli::CliCallbacks;
 /// // Now lets add a body to the child
 /// {
 ///     // Get the root
-///     let root = doc.get_root();
+///     let root = doc.get_root().unwrap();
 ///     // Get the child's id
 ///     let child_id = root.children[0];
 ///     // Modify the body
 ///     doc.modify_task(&child_id, |child| {
 ///         child.set_body("This is the child's body");
+///         Ok(())
 ///     });
 ///     // Read the body
-///     assert_eq!("This is the child's body", doc.get(&child_id).body);
+///     assert_eq!("This is the child's body", doc.get(&child_id).unwrap().body);
 /// }
 /// 
 /// 
 /// // Now lets work on the child
 /// {
 ///     // Get the root
-///     let root = doc.get_root();
+///     let root = doc.get_root().unwrap();
 ///     // Get the child's id
 ///     let child_id = root.children[0];
 /// 
 ///     // Let's make it a task and assign TODO to it
 ///     doc.modify_task(&child_id, |child| {
 ///         child.set_progress(Progress::Todo);
+///         Ok(())
 ///     });
 /// 
 ///     // Start working and start tracking the time.
@@ -95,6 +99,7 @@ use crate::cli::CliCallbacks;
 ///     // Do some work.  And when done, mark it as done.
 ///     doc.modify_task(&child_id, |child| {
 ///         child.set_progress(Progress::Done);
+///         Ok(())
 ///     });
 /// 
 ///     // And finally clock out.
@@ -127,7 +132,7 @@ impl Doc {
     /// # Example
     /// 
     /// ```
-    /// use todoapp3::doc::Doc;
+    /// use sors::doc::Doc;
     /// let doc = Doc::new();
     /// ```
     pub fn new() -> Doc {
