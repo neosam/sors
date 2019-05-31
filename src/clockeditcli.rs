@@ -1,12 +1,8 @@
-use crate::terminal::*;
 use crate::clockedit::*;
 use crate::error::*;
 use crate::doc::*;
 use crate::helper::*;
-use crate::statics;
-
-use rustyline::error::ReadlineError;
-use rustyline::Editor;
+use crate::cli::{Cli, CliCallbacks, CliStateCallback};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExitAction {
@@ -21,13 +17,16 @@ pub struct ClockEditCli<'a> {
     pub doc: &'a Doc,
 }
 
+pub struct ClockCallbacks;
+impl<'a> CliStateCallback<ClockEditCli<'a>> for ClockCallbacks {}
+
 impl<'a> ClockEditCli<'a> {
-    pub fn run(self) -> Self {
-        let mut terminal = Terminal::new(self);
-        terminal.register_command("cancel", Box::new(|_, _| {
-            Ok(true)
+    pub fn apply_commands<C: CliCallbacks<ClockEditCli<'a>>>(terminal: &mut Cli<ClockEditCli<'a>, C>) {
+        terminal.register_command("cancel", Box::new(|_, _, callbacks| {
+            callbacks.exit();
+            Ok(())
         }));
-        terminal.register_command("start", Box::new(|state: &mut ClockEditCli, line: &str| {
+        terminal.register_command("start", Box::new(|state: &mut ClockEditCli, line: &str, _| {
             let mut splitted_line = line.split(" ");
             splitted_line.next();
             let i = if let Some(index) = splitted_line.next() {
@@ -39,9 +38,9 @@ impl<'a> ClockEditCli<'a> {
                 let time = parse_time(start_str)?;
                 state.clockedit.set_start_time(i - 1, time)?;
             }
-            Ok(false)
+            Ok(())
         }));
-        terminal.register_command("end", Box::new(|state: &mut ClockEditCli, line: &str| {
+        terminal.register_command("end", Box::new(|state: &mut ClockEditCli, line: &str, _| {
             let mut splitted_line = line.split(" ");
             splitted_line.next();
             let i = if let Some(index) = splitted_line.next() {
@@ -53,9 +52,9 @@ impl<'a> ClockEditCli<'a> {
                 let time = parse_time(end_str)?;
                 state.clockedit.set_end_time(i - 1, time)?;
             }
-            Ok(false)
+            Ok(())
         }));
-        terminal.register_command("enddate", Box::new(|state: &mut ClockEditCli, line: &str| {
+        terminal.register_command("enddate", Box::new(|state: &mut ClockEditCli, line: &str, _| {
             let mut splitted_line = line.split(" ");
             splitted_line.next();
             let i = if let Some(index) = splitted_line.next() {
@@ -67,13 +66,14 @@ impl<'a> ClockEditCli<'a> {
                 let date = parse_date(end_str)?;
                 state.clockedit.set_end_date(i - 1, date)?;
             }
-            Ok(false)
+            Ok(())
         }));
-        terminal.register_command("apply", Box::new(|state: &mut ClockEditCli, _| {
+        terminal.register_command("apply", Box::new(|state: &mut ClockEditCli, _, callbacks| {
             state.apply_result = ExitAction::Apply;
-            Ok(true)
+            callbacks.exit();
+            Ok(())
         }));
-        terminal.register_command("ls", Box::new(|state: &mut ClockEditCli, _| {
+        terminal.register_command("ls", Box::new(|state: &mut ClockEditCli, _, callbacks| {
             for (clock, i) in state.clockedit.clocks.iter().zip(1..) {
                 let start = &clock.start;
                 let end = clock.end.map(|end| format!("{}", end)).unwrap_or("(none)".to_string());
@@ -87,32 +87,9 @@ impl<'a> ClockEditCli<'a> {
                 } else {
                     "(none)".to_string()
                 };
-                println!("{}: {} - {}:\n Task: {}\n Comment: {}", i, start, end, task_str, comment);
+                callbacks.println(&format!("{}: {} - {}:\n Task: {}\n Comment: {}", i, start, end, task_str, comment));
             }
-            Ok(false)
+            Ok(())
         }));
-
-        let mut rl = Editor::<()>::new();
-        if rl.load_history(&*statics::CLOCK_HISTORY_FILE).is_err() {
-            println!("No previous history.");
-        }
-        loop {
-            match rl.readline("clockedit > ") {
-                Ok(input) => {
-                    let exit = terminal.run_command(&input);
-                    rl.add_history_entry(input);
-                    if exit {
-                        break;
-                    }
-                },
-                Err(ReadlineError::Eof) => break,
-                Err(ReadlineError::Interrupted) => break,
-                Err(err) => println!("Error: {}", err),
-            }
-        }
-        if let Err(err) = rl.save_history(&*statics::CLOCK_HISTORY_FILE) {
-            println!("Failed to save history: {}", err);
-        }
-        terminal.state
     }
 }

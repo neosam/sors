@@ -7,7 +7,7 @@ pub mod tasks;
 pub mod clock;
 pub mod doc;
 pub mod state;
-pub mod terminal;
+pub mod cli;
 
 pub use std::env::var;
 pub use uuid::Uuid;

@@ -14,6 +14,7 @@ use std::path::Path;
 use snafu::ResultExt;
 use chrono::prelude::*;
 use super::statics::*;
+use crate::cli::CliCallbacks;
 
 /// Holding data which are serialized and stored to disk.
 /// 
@@ -461,38 +462,38 @@ impl Doc {
 
 
 
-pub fn rec_print(doc: &mut Doc, task_id: &Uuid, level: usize, max_depth: usize) -> Result<()> {
+pub fn rec_print<T>(doc: &mut Doc, task_id: &Uuid, level: usize, max_depth: usize, callbacks: &mut CliCallbacks<T>) -> Result<()> {
     if level >= max_depth {
         return Ok(());
     }
     let task = doc.get(task_id)?;
     for _ in 0..level {
-        print!(" ");
+        callbacks.print(" ");
     }
-    print!("* ");
-    println!("{} {}", task.id, task.title);
+    callbacks.print("* ");
+    callbacks.println(&format!("{} {}", task.id, task.title));
     for child_id in task.children.iter() {
-        rec_print(doc, child_id, level + 1, max_depth)?;
+        rec_print(doc, child_id, level + 1, max_depth, callbacks)?;
     }
     Ok(())
 }
 
-pub fn dump_html_rec(doc: &Doc, dir: &Path, task_ref: &Uuid) -> Result<()> {
+pub fn dump_html_rec<T>(doc: &Doc, dir: &Path, task_ref: &Uuid, callbacks: &mut CliCallbacks<T>) -> Result<()> {
     let task = doc.get(task_ref)?;
     for child in task.children.iter() {
-        dump_html_rec(doc, dir, child)?;
+        dump_html_rec(doc, dir, child, callbacks)?;
     }
     let task_html = doc.to_html(task_ref)?;
     let filename = dir.join(format!("{}.html", task_ref));
-    println!("{}", filename.to_str().unwrap_or("N/A"));
+    callbacks.println(&format!("{}", filename.to_str().unwrap_or("N/A")));
     let mut html_file = File::create(filename).context(IO)?;
     html_file.write_all(task_html.as_bytes()).context(IO)?;
     Ok(())
 }
 
-pub fn dump_html(doc: &Doc, dir: &Path, task_ref: &Uuid) -> Result<()> {
+pub fn dump_html<T>(doc: &Doc, dir: &Path, task_ref: &Uuid, callbacks: &mut CliCallbacks<T>) -> Result<()> {
     std::fs::create_dir_all(dir).context(IO)?;
-    dump_html_rec(doc, dir, task_ref)?;
+    dump_html_rec(doc, dir, task_ref, callbacks)?;
     let filename = dir.join(format!("index.html"));
     let mut index_file = File::create(filename).context(IO)?;
     index_file.write_all(b"<!doctype html><html><head></head><body><a href=\"").context(IO)?;

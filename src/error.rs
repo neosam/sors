@@ -44,6 +44,15 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum CliError {
     #[snafu(display("Couldn't parse: {}", msg))]
     ParseError { msg: String },
+
+    #[snafu(display("Command not found: {}", command))]
+    CommandNotFound { command: String },
+
+    #[snafu(display("Input is empty"))]
+    Empty,
+
+    #[snafu(display("Error: {}", msg))]
+    OtherError { msg: String },
 }
 
 pub type CliResult<T, E = CliError> = std::result::Result<T, E>;

@@ -2,6 +2,7 @@ use crate::doc::*;
 use crate::clock::*;
 use crate::error::*;
 use crate::DurationPrint;
+use crate::cli::CliCallbacks;
 use std::rc::Rc;
 use chrono::Local;
 use chrono::TimeZone;
@@ -32,7 +33,7 @@ pub fn parse_time(string: &str) -> chrono::ParseResult<chrono::NaiveTime> {
     Ok(time)
 }
 
-pub fn display_clocks(clocks: &Vec<Rc<Clock>>, doc: &Doc) {
+pub fn display_clocks<T>(clocks: &Vec<Rc<Clock>>, doc: &Doc, callbacks: &mut CliCallbacks<T>) {
     let overall_duration = clocks.iter()
         .map(|clock| clock.duration())
         .fold(chrono::Duration::zero(), |acc, new| acc + new);
@@ -55,22 +56,22 @@ pub fn display_clocks(clocks: &Vec<Rc<Clock>>, doc: &Doc) {
         };
         let day = start.date();
         if Some(day) != current_day {
-            println!("--- {} ---", day);
+            callbacks.println(&format!("--- {} ---", day));
         }
-        println!("{} - {}:\n Task: {}\n Comment: {}", start, end, task_str, comment);
+        callbacks.println(&format!("{} - {}:\n Task: {}\n Comment: {}", start, end, task_str, comment));
         if Some(day) != current_day {
             if current_day.is_some() {
-                println!("Day duration: {}", day_duration.print());
-                println!();
+                callbacks.println(&format!("Day duration: {}", day_duration.print()));
+                callbacks.println("");
             }
             day_duration = chrono::Duration::zero();
             current_day = Some(day);
         }
         day_duration = day_duration + clock.duration();
     }
-    println!("Day duration: {}", day_duration.print());
-    println!();
-    println!("Overall duration in time range: {}", overall_duration.print());
+    callbacks.println(&format!("Day duration: {}", day_duration.print()));
+    callbacks.println("");
+    callbacks.println(&format!("Overall duration in time range: {}", overall_duration.print()));
 }
 
 pub fn parse_date(date_str: &str) -> CliResult<Date<Local>> {
