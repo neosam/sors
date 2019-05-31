@@ -33,6 +33,9 @@ pub enum Error {
 
     #[snafu(display("Parsing Error: {}", source))]
     ChronoParseError { source: chrono::format::ParseError },
+
+    #[snafu(display("{}",msg))]
+    TaskSerializeError { msg: String },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

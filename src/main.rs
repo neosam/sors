@@ -181,13 +181,13 @@ fn main() {
         }
         Ok(())
     }));
-    terminal.register_command("ed", Box::new(|state: &mut State, _, _| {
-        let task = vim_edit_task(state.doc.get(&state.wt)?);
+    terminal.register_command("ed", Box::new(|state: &mut State, _, callbacks| {
+        let task = vim_edit_task(state.doc.get(&state.wt)?, callbacks)?;
         state.doc.upsert(task);
         Ok(())
     }));
-    terminal.register_command("add", Box::new(|state: &mut State, _, _| {
-        let task = vim_edit_task(Rc::new(Task::new()));
+    terminal.register_command("add", Box::new(|state: &mut State, _, callbacks| {
+        let task = vim_edit_task(Rc::new(Task::new()), callbacks)?;
         state.doc.add_subtask(task, &state.wt)?;
         Ok(())
     }));

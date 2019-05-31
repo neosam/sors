@@ -6,14 +6,12 @@ use super::tasks::*;
 use super::clock::*;
 use super::error::*;
 use std::io::Write;
-use std::io::Read;
 use std::fs::File;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::path::Path;
 use snafu::ResultExt;
 use chrono::prelude::*;
-use super::statics::*;
 use crate::cli::CliCallbacks;
 
 /// Holding data which are serialized and stored to disk.
@@ -502,23 +500,23 @@ pub fn dump_html<T>(doc: &Doc, dir: &Path, task_ref: &Uuid, callbacks: &mut CliC
     Ok(())
 }
 
-pub fn vim_edit_task(mut task: Rc<Task>) -> Rc<Task> {
-    {   
-        let mut out = File::create(&*TASK_FILE).expect("Could not create .task file");
-        out.write_all(task.title.as_bytes()).expect("Couldn't write title to .task file");
-        out.write_all("\n\n".as_bytes()).expect("Couldn't write newlines to .task file");
-        out.write_all(task.body.as_bytes()).expect("Couldn't write body to .task file");
-    }
-    subprocess::Exec::cmd("vi").arg(&*TASK_FILE).join().unwrap();
-    let mut content = String::new();
-    {
-        let mut input = File::open(&*TASK_FILE).expect("Could not open .task file");
-        input.read_to_string(&mut content).expect("Couldn't read .task file");
-    }
+pub fn vim_edit_task<T, C: CliCallbacks<T>>(mut task: Rc<Task>, callbacks: &mut C) -> Result<Rc<Task>> {
+    let serialized_task = {   
+        let mut serialized_task = String::new();
+        serialized_task.push_str(&task.title);
+        serialized_task.push_str("\n\n");
+        serialized_task.push_str(&task.body);
+        serialized_task
+    };
+    let content = callbacks.edit_string(serialized_task);
     let mut lines = content.lines();
-    let title = lines.next().expect("Couldn't extract title");
+    let title = if let Some(title) = lines.next() {
+        title
+    } else {
+        return Err(Error::TaskSerializeError { msg: "Couldn't find a title".to_string() })
+    };
     let body = lines.fold(String::new(), |mut acc: String, item| { acc.push_str(&item); acc.push('\n'); acc});
     task.set_title(title).set_body(body.trim());
-    task
+    Ok(task)
 }
 
